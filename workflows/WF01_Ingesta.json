@@ -302,7 +302,10 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "ySVq8j0bYes31oa4",
+    "callerPolicy": "workflowsFromSameOwner"
   },
   "versionId": "ff26d2c0-40ed-48a8-82b6-5d39e5ccf889",
   "meta": {
