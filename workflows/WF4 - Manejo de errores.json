@@ -1,0 +1,154 @@
+{
+  "name": "WF4 - Manejo de errores",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -496,
+        -208
+      ],
+      "id": "1b7302de-7cef-46d5-8517-1f44037dae1b",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "errores",
+          "mode": "list",
+          "cachedResultName": "errores"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow": "={{ $json.workflow.name }}",
+            "nodo": "={{ $json.execution.lastNodeExecuted }}",
+            "mensaje": "={{ $json.execution.error.message || 'Error sin mensaje' }}",
+            "id_ejecucion": "={{ $json.execution.id }}",
+            "datos": "={{ JSON.stringify({ modo: $json.execution.mode, url: $json.execution.url, error: $json.execution.error }) }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id_error",
+              "displayName": "id_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "nodo",
+              "displayName": "nodo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mensaje",
+              "displayName": "mensaje",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "id_ejecucion",
+              "displayName": "id_ejecucion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "datos",
+              "displayName": "datos",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -272,
+        -208
+      ],
+      "id": "6a9633e8-742d-47c1-9f61-503690c36635",
+      "name": "Registrar error",
+      "credentials": {
+        "postgres": {
+          "id": "8qFZRzVVHhlPl7Lq",
+          "name": "Postgres Inventario"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Registrar error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "18559b0c-e797-4829-a845-958d1b473302",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1a8ee50d659751cad9ab85ce1b7842650fc4b875b3511677dfe586aeb6380720"
+  },
+  "nodeGroups": [],
+  "id": "ySVq8j0bYes31oa4",
+  "tags": []
+}
