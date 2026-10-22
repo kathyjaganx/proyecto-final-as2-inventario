@@ -1,0 +1,9 @@
+# Credenciales: nunca se suben a GitHub
+.env
+
+# Archivos del sistema de Windows
+Thumbs.db
+desktop.ini
+
+# Configuración local de VS Code
+.vscode/

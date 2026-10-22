@@ -1,0 +1,315 @@
+{
+  "name": "WF1 - Ingesta de prestamos",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prestamos",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -528,
+        -224
+      ],
+      "id": "c005ff55-1e1d-4026-903c-5cc8f624b24b",
+      "name": "Webhook",
+      "webhookId": "329e4f35-3e3f-4919-9476-321c835af617",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "njJpxliYvdiXPm1x",
+          "name": "API Key Prestamos"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================\n// WF1 - Validar datos de la solicitud de préstamo\n// Autora: Irma Yaritza Katiuxca Jagan Xol - 4090-23-9748\n// =====================================================\n\nconst body = $input.first().json.body || {};\nconst errores = [];\n\n// Limpiar los datos recibidos\nconst carne = String(body.carne || '').trim();\nconst nombre = String(body.nombre_estudiante || '').trim();\nconst codigo = String(body.codigo_equipo || '').trim().toUpperCase();\nconst cantidad = Number(body.cantidad);\nconst fecha = String(body.fecha_devolucion || '').trim();\n\n// 1. Carné: formato 0000-00-0000\nif (!/^\\d{4}-\\d{2}-\\d{3,6}$/.test(carne)) {\n  errores.push('Carné inválido. Formato esperado: 0000-00-0000');\n}\n\n// 2. Nombre: solo letras y espacios, de 3 a 100 caracteres\nif (!/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü ]{3,100}$/.test(nombre)) {\n  errores.push('Nombre inválido. Solo letras y espacios (3 a 100 caracteres)');\n}\n\n// 3. Código de equipo: formato AAA-000\nif (!/^[A-Z]{3}-\\d{3}$/.test(codigo)) {\n  errores.push('Código de equipo inválido. Formato esperado: AAA-000');\n}\n\n// 4. Cantidad: número entero entre 1 y 10\nif (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > 10) {\n  errores.push('Cantidad inválida. Debe ser un número entero entre 1 y 10');\n}\n\n// 5. Fecha de devolución: formato AAAA-MM-DD, desde hoy hasta 30 días\nconst hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guatemala' });\nconst limite = new Date(hoy + 'T12:00:00Z');\nlimite.setUTCDate(limite.getUTCDate() + 30);\nconst fechaLimite = limite.toISOString().slice(0, 10);\n\nconst fechaValida =\n  /^\\d{4}-\\d{2}-\\d{2}$/.test(fecha) &&\n  new Date(fecha + 'T12:00:00Z').toISOString().slice(0, 10) === fecha;\n\nif (!fechaValida) {\n  errores.push('Fecha de devolución inválida. Formato esperado: AAAA-MM-DD');\n} else if (fecha < hoy || fecha > fechaLimite) {\n  errores.push(`La fecha de devolución debe estar entre ${hoy} y ${fechaLimite}`);\n}\n\nreturn [{\n  json: {\n    valido: errores.length === 0,\n    errores,\n    datos: {\n      carne,\n      nombre_estudiante: nombre,\n      codigo_equipo: codigo,\n      cantidad,\n      fecha_devolucion: fecha\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -304,
+        -224
+      ],
+      "id": "ab6c9e1a-a8e6-4151-a870-212bac64935b",
+      "name": "Validar datos"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5ee1f995-c514-48cc-90e3-65f4233471ee",
+              "leftValue": "={{ $json.valido }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -80,
+        -224
+      ],
+      "id": "1c365048-f9f5-418f-975e-a3951799ae5d",
+      "name": "¿Datos validos?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"estado\": \"RECHAZADO\",\n  \"mensaje\": \"La solicitud tiene datos invalidos\",\n  \"errores\": {{ JSON.stringify($('Validar datos').item.json.errores) }}\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        368,
+        -128
+      ],
+      "id": "2840cdd7-735d-4b2d-97dd-696033abedf9",
+      "name": "Responder rechazo"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "auditoria",
+          "mode": "list",
+          "cachedResultName": "auditoria"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow": "WF1 - Ingesta de prestamos",
+            "accion": "SOLICITUD_PRESTAMO",
+            "resultado": "RECHAZADO",
+            "detalle": "=\t{{ JSON.stringify({ datos: $json.datos, errores: $json.errores }) }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id_auditoria",
+              "displayName": "id_auditoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "accion",
+              "displayName": "accion",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resultado",
+              "displayName": "resultado",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detalle",
+              "displayName": "detalle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        144,
+        -128
+      ],
+      "id": "5bd1ed35-ddfc-44ed-a11c-fb40ce1accd8",
+      "name": "Auditoria rechazo",
+      "credentials": {
+        "postgres": {
+          "id": "8qFZRzVVHhlPl7Lq",
+          "name": "Postgres Inventario"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "qE6W8XuDcMuQ8kvu",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/qE6W8XuDcMuQ8kvu",
+          "cachedResultName": "WF2 - Procesamiento de prestamos"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        144,
+        -320
+      ],
+      "id": "797d50fc-cccd-4d6f-b6f8-829ea7fc6831",
+      "name": "Procesar en WF2"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": "={{ $json.estado === 'APROBADO' ? 201 : 409 }}"
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        368,
+        -320
+      ],
+      "id": "b43a27ee-9d59-4c8c-8772-ae642e401865",
+      "name": "Responder resultado"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validar datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar datos": {
+      "main": [
+        [
+          {
+            "node": "¿Datos validos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Datos validos?": {
+      "main": [
+        [
+          {
+            "node": "Procesar en WF2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Auditoria rechazo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auditoria rechazo": {
+      "main": [
+        [
+          {
+            "node": "Responder rechazo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar en WF2": {
+      "main": [
+        [
+          {
+            "node": "Responder resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "ff26d2c0-40ed-48a8-82b6-5d39e5ccf889",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1a8ee50d659751cad9ab85ce1b7842650fc4b875b3511677dfe586aeb6380720"
+  },
+  "nodeGroups": [],
+  "id": "Qx7Do9rDe718EPsT",
+  "tags": []
+}
