@@ -4,6 +4,9 @@
 # Reportes generados automáticamente por el WF3
 reportes/*.csv
 
+# Archivos temporales de Word y Excel
+~$*
+
 # Archivos del sistema de Windows
 Thumbs.db
 desktop.ini
