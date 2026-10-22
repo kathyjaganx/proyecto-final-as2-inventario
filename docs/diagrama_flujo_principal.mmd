@@ -1,0 +1,35 @@
+%%{init: {'theme': 'default'}}%%
+flowchart TD
+    A(["Solicitud POST /webhook/prestamos"]) --> B{"¿Clave X-API-Key<br/>válida?"}
+    B -- No --> B1["Responder 403<br/>Acceso denegado"]
+    B -- Sí --> C["Validar datos<br/>carné · nombre · código · cantidad · fecha"]
+    C --> D{"¿Datos válidos?"}
+    D -- No --> E["Registrar en auditoria<br/>RECHAZADO"]
+    E --> F["Responder 400<br/>lista de errores"]
+    D -- Sí --> G[["Llamar al WF2 — Procesamiento"]]
+    G --> H["Consulta atómica<br/>descontar stock + registrar préstamo"]
+    H --> I{"¿Préstamo aprobado?"}
+    I -- Sí --> J["Registrar en auditoria<br/>EXITO"]
+    J --> K["Responder 201<br/>número de préstamo y stock restante"]
+    I -- No --> L["Registrar en auditoria<br/>RECHAZADO con motivo"]
+    L --> M["Responder 409<br/>sin stock o equipo inexistente"]
+    H -. "si ocurre un error" .-> N["WF4 — Registrar en tabla errores"]
+
+    subgraph WF1["WF1 — Ingesta"]
+        A
+        B
+        B1
+        C
+        D
+        E
+        F
+        K
+        M
+    end
+ 
+    subgraph WF2["WF2 — Procesamiento"]
+        G
+        H
+        I
+        J
+        L

@@ -1,0 +1,26 @@
+flowchart LR
+    CLI["Cliente<br/>POST /webhook/prestamos<br/>Header X-API-Key"]
+
+    subgraph LOCAL["Computadora local — Docker Compose"]
+        direction LR
+        subgraph N8N["n8n (inventario_n8n :5678)"]
+            WF1["WF1<br/>Ingesta"]
+            WF2["WF2<br/>Procesamiento"]
+            WF3["WF3<br/>Salida (7:00 a. m.)"]
+            WF4["WF4<br/>Manejo de errores"]
+        end
+        PG[("PostgreSQL 16<br/>inventario_db :5432<br/>equipos · prestamos<br/>auditoria · errores")]
+        REP["reportes/<br/>reporte_vencidos_AAAA-MM-DD.csv"]
+        ENV[".env<br/>credenciales"]
+    end
+
+    CLI -->|"solicitud JSON"| WF1
+    WF1 -->|"datos válidos"| WF2
+    WF1 -->|"auditoría de rechazos"| PG
+    WF2 -->|"registro atómico + auditoría"| PG
+    WF3 -->|"marca vencidos + auditoría"| PG
+    WF3 -->|"escribe CSV"| REP
+    WF1 & WF2 & WF3 -.->|"si fallan"| WF4
+    WF4 -->|"registra error"| PG
+    ENV -.->|"variables de entorno"| N8N
+    ENV -.->|"variables de entorno"| PG
