@@ -4,6 +4,9 @@
 # Reportes generados automáticamente por el WF3
 reportes/*.csv
 
+# Archivos compilados de Maven (se generan con mvn compile / mvn test)
+target/
+
 # Archivos temporales de Word y Excel
 ~$*
 
