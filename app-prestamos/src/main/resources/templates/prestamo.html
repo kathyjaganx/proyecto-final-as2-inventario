@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Préstamos de laboratorio</title>
+    <style>
+        :root {
+            --fondo: #f4f6fa; --tarjeta: #ffffff; --texto: #1f2937; --suave: #6b7280;
+            --borde: #d1d5db; --primario: #1f3864; --primario-hover: #2e4a80;
+            --exito-fondo: #e8f5e9; --exito-borde: #2e7d32;
+            --rechazo-fondo: #fff4e5; --rechazo-borde: #e08600;
+            --error-fondo: #fdecea; --error-borde: #c62828;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --fondo: #111827; --tarjeta: #1f2937; --texto: #f3f4f6; --suave: #9ca3af;
+                --borde: #374151; --primario: #3b6fd1; --primario-hover: #5585e0;
+                --exito-fondo: #12301a; --rechazo-fondo: #3a2a0f; --error-fondo: #3b1414;
+            }
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; padding: 2rem 1rem; background: var(--fondo); color: var(--texto);
+            font-family: "Segoe UI", Arial, sans-serif; line-height: 1.5;
+        }
+        .contenedor { max-width: 640px; margin: 0 auto; }
+        header { margin-bottom: 1.5rem; }
+        header h1 { margin: 0; font-size: 1.6rem; color: var(--primario); }
+        header p { margin: .25rem 0 0; color: var(--suave); }
+        .tarjeta {
+            background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 10px;
+            padding: 1.5rem; margin-bottom: 1.25rem;
+        }
+        label { display: block; font-weight: 600; margin-bottom: .3rem; }
+        .ayuda { font-weight: 400; color: var(--suave); font-size: .85rem; }
+        input {
+            width: 100%; padding: .6rem .75rem; margin-bottom: 1rem; font-size: 1rem;
+            border: 1px solid var(--borde); border-radius: 6px; background: var(--tarjeta); color: var(--texto);
+        }
+        input:focus { outline: 2px solid var(--primario); border-color: var(--primario); }
+        .fila { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        button {
+            width: 100%; padding: .75rem; font-size: 1rem; font-weight: 600; cursor: pointer;
+            color: #fff; background: var(--primario); border: none; border-radius: 6px;
+        }
+        button:hover { background: var(--primario-hover); }
+        .resultado { border-left-width: 6px; }
+        .resultado h2 { margin: 0 0 .5rem; font-size: 1.15rem; }
+        .resultado ul { margin: 0; padding-left: 1.2rem; }
+        .resultado .codigo { color: var(--suave); font-size: .85rem; margin-top: .75rem; }
+        .exito   { background: var(--exito-fondo);   border-left-color: var(--exito-borde); }
+        .rechazo { background: var(--rechazo-fondo); border-left-color: var(--rechazo-borde); }
+        .error   { background: var(--error-fondo);   border-left-color: var(--error-borde); }
+        footer { text-align: center; color: var(--suave); font-size: .8rem; }
+        @media (max-width: 480px) { .fila { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<div class="contenedor">
+
+    <header>
+        <h1>Préstamo de equipo de laboratorio</h1>
+        <p>Registra una solicitud. El sistema valida los datos y verifica el stock disponible.</p>
+    </header>
+
+    <!-- Resultado: solo aparece después de enviar el formulario -->
+    <section th:if="${respuesta != null}"
+             class="tarjeta resultado"
+             th:classappend="${respuesta.fueAprobado() ? 'exito' : (respuesta.estado() == 'ERROR' ? 'error' : 'rechazo')}">
+        <h2 th:text="${respuesta.fueAprobado() ? '✅ Préstamo aprobado'
+                      : (respuesta.estado() == 'ERROR' ? '⚠️ No se pudo procesar' : '❌ Solicitud rechazada')}">
+            Resultado
+        </h2>
+        <ul>
+            <li th:each="parte : ${#strings.arraySplit(respuesta.mensaje(), ';')}"
+                th:text="${#strings.trim(parte)}">Mensaje</li>
+        </ul>
+        <p class="codigo" th:text="|Código de respuesta: ${respuesta.codigoHttp()}|">Código</p>
+    </section>
+
+    <!-- Formulario -->
+    <form class="tarjeta" method="post" th:action="@{/prestamos}" th:object="${formulario}">
+
+        <label for="carne">Carné <span class="ayuda">(formato 0000-00-0000)</span></label>
+        <input id="carne" type="text" th:field="*{carne}" placeholder="4090-23-1234" required>
+
+        <label for="nombreEstudiante">Nombre del estudiante</label>
+        <input id="nombreEstudiante" type="text" th:field="*{nombreEstudiante}" placeholder="Ana Lucía Pop" required>
+
+        <div class="fila">
+            <div>
+                <label for="codigoEquipo">Código de equipo</label>
+                <input id="codigoEquipo" type="text" th:field="*{codigoEquipo}" list="equipos"
+                       placeholder="LAP-001" required>
+                <datalist id="equipos">
+                    <option value="LAP-001">Laptop Dell Latitude</option>
+                    <option value="PRO-001">Proyector Epson</option>
+                    <option value="MUL-001">Multímetro digital</option>
+                    <option value="ARD-001">Kit Arduino UNO</option>
+                    <option value="HDM-001">Cable HDMI 3m</option>
+                </datalist>
+            </div>
+            <div>
+                <label for="cantidad">Cantidad <span class="ayuda">(1 a 10)</span></label>
+                <input id="cantidad" type="number" th:field="*{cantidad}" min="1" max="10" placeholder="1" required>
+            </div>
+        </div>
+
+        <label for="fechaDevolucion">Fecha de devolución <span class="ayuda">(máximo 30 días)</span></label>
+        <input id="fechaDevolucion" type="date" th:field="*{fechaDevolucion}" required>
+
+        <button type="submit">Solicitar préstamo</button>
+    </form>
+
+    <footer>
+        Control de inventario y préstamos de laboratorio · Análisis de Sistemas II · UMG<br>
+        Irma Yaritza Katiuxca Jagan Xol — 4090-23-9748
+    </footer>
+</div>
+</body>
+</html>
