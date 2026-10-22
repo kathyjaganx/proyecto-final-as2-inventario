@@ -34,8 +34,10 @@ services:
       GENERIC_TIMEZONE: America/Guatemala
       TZ: America/Guatemala
       N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_RESTRICT_FILE_ACCESS_TO: /reportes
     volumes:
       - n8n_data:/home/node/.n8n
+      - ./reportes:/reportes
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,0 +1,282 @@
+{
+  "name": "WF3 - Salida de reportes",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -608,
+        -144
+      ],
+      "id": "d29b659f-5a08-4726-97d2-ae623ecf2790",
+      "name": "Cada dia 7am"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH nuevos_vencidos AS (\n  UPDATE prestamos\n  SET estado = 'VENCIDO'\n  WHERE estado = 'ACTIVO'\n    AND fecha_devolucion_real IS NULL\n    AND fecha_devolucion_esperada < CURRENT_DATE\n  RETURNING id_prestamo\n)\nSELECT\n  p.id_prestamo,\n  p.carne,\n  p.nombre_estudiante,\n  e.codigo                                        AS codigo_equipo,\n  e.nombre                                        AS equipo,\n  p.cantidad,\n  p.fecha_devolucion_esperada,\n  (CURRENT_DATE - p.fecha_devolucion_esperada)    AS dias_atraso,\n  p.id_prestamo IN (SELECT id_prestamo FROM nuevos_vencidos) AS vencido_hoy\nFROM prestamos p\nJOIN equipos e ON e.id_equipo = p.id_equipo\nWHERE p.fecha_devolucion_real IS NULL\n  AND p.fecha_devolucion_esperada < CURRENT_DATE\n  AND p.estado IN ('ACTIVO', 'VENCIDO')\nORDER BY dias_atraso DESC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -464,
+        -144
+      ],
+      "id": "d1b45c02-eea0-46c4-b1aa-1ae2ba5a241f",
+      "name": "Buscar vencidos",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "8qFZRzVVHhlPl7Lq",
+          "name": "Postgres Inventario"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================\n// WF3 - Generar reporte diario de préstamos vencidos\n// Autora: Irma Yaritza Katiuxca Jagan Xol - 4090-23-9748\n// =====================================================\n\n// Quitar el elemento vacío que llega cuando no hay vencidos\nconst filas = $input.all()\n  .map(item => item.json)\n  .filter(fila => fila.id_prestamo);\n\nconst hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guatemala' });\nconst nuevosHoy = filas.filter(fila => fila.vencido_hoy).length;\n\nconst vencidos = filas.map(fila => ({\n  id_prestamo: fila.id_prestamo,\n  carne: fila.carne,\n  estudiante: fila.nombre_estudiante,\n  equipo: `${fila.codigo_equipo} - ${fila.equipo}`,\n  cantidad: fila.cantidad,\n  fecha_devolucion: String(fila.fecha_devolucion_esperada).slice(0, 10),\n  dias_atraso: Number(fila.dias_atraso)\n}));\n\nreturn [{\n  json: {\n    fecha_reporte: hoy,\n    total_vencidos: vencidos.length,\n    nuevos_vencidos_hoy: nuevosHoy,\n    mensaje: vencidos.length === 0\n      ? 'Sin prestamos vencidos'\n      : `Hay ${vencidos.length} prestamo(s) vencido(s)`,\n    vencidos\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -304,
+        -144
+      ],
+      "id": "a510fef1-496b-46a4-91fa-5f0bf9ba1c55",
+      "name": "Generar reporte"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "auditoria",
+          "mode": "list",
+          "cachedResultName": "auditoria"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow": "WF3 - Salida de reportes",
+            "accion": "REPORTE_VENCIDOS",
+            "resultado": "EXITO",
+            "detalle": "={{ JSON.stringify($json) }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id_auditoria",
+              "displayName": "id_auditoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "accion",
+              "displayName": "accion",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resultado",
+              "displayName": "resultado",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detalle",
+              "displayName": "detalle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -160,
+        -256
+      ],
+      "id": "57cb7e7e-0b30-44b3-b5d7-01fc3052fb9a",
+      "name": "Auditoria reporte",
+      "credentials": {
+        "postgres": {
+          "id": "8qFZRzVVHhlPl7Lq",
+          "name": "Postgres Inventario"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================\n// WF3 - Preparar filas para el archivo CSV\n// Autora: Irma Yaritza Katiuxca Jagan Xol - 4090-23-9748\n// =====================================================\n\nconst reporte = $input.first().json;\n\n// Si no hay vencidos, el archivo lleva una sola fila indicándolo\nif (reporte.total_vencidos === 0) {\n  return [{\n    json: {\n      fecha_reporte: reporte.fecha_reporte,\n      id_prestamo: '',\n      carne: '',\n      estudiante: 'Sin prestamos vencidos',\n      equipo: '',\n      cantidad: '',\n      fecha_devolucion: '',\n      dias_atraso: ''\n    }\n  }];\n}\n\n// Una fila por cada préstamo vencido\nreturn reporte.vencidos.map(vencido => ({\n  json: {\n    fecha_reporte: reporte.fecha_reporte,\n    ...vencido\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        -16
+      ],
+      "id": "ca661e37-4644-4b67-b999-b6843f24c6c9",
+      "name": "Preparar filas CSV"
+    },
+    {
+      "parameters": {
+        "options": {
+          "fileName": "=reporte_vencidos_{{ $('Generar reporte').first().json.fecha_reporte }}.csv"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        16,
+        -16
+      ],
+      "id": "4c197310-080e-43e4-8feb-7e804b6d6fcd",
+      "name": "Convertir a CSV"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/reportes/{{ $binary.data.fileName }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        160,
+        -16
+      ],
+      "id": "c2f8d4d6-8795-4cb4-9588-c0ea5c5ccd7a",
+      "name": "Guardar CSV"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cada dia 7am": {
+      "main": [
+        [
+          {
+            "node": "Buscar vencidos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar vencidos": {
+      "main": [
+        [
+          {
+            "node": "Generar reporte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar reporte": {
+      "main": [
+        [
+          {
+            "node": "Preparar filas CSV",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Auditoria reporte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar filas CSV": {
+      "main": [
+        [
+          {
+            "node": "Convertir a CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convertir a CSV": {
+      "main": [
+        [
+          {
+            "node": "Guardar CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "ySVq8j0bYes31oa4",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "21a7e86e-edb8-4a64-b428-f9841fd5594b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1a8ee50d659751cad9ab85ce1b7842650fc4b875b3511677dfe586aeb6380720"
+  },
+  "nodeGroups": [],
+  "id": "TZIZ1bIGELAk0E6F",
+  "tags": []
+}

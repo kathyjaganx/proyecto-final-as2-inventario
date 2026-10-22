@@ -1,6 +1,9 @@
 # Credenciales: nunca se suben a GitHub
 .env
 
+# Reportes generados automáticamente por el WF3
+reportes/*.csv
+
 # Archivos del sistema de Windows
 Thumbs.db
 desktop.ini
