@@ -1,0 +1,129 @@
+@startuml clases
+set separator none
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam ClassBackgroundColor #EEF3FA
+skinparam ClassBorderColor #1F3864
+skinparam ArrowColor #1F3864
+skinparam packageStyle rectangle
+hide empty members
+title Diagrama de clases\nAplicación web app-prestamos
+
+package "gt.umg.inventario.prestamos" {
+
+  class AppPrestamosApplication <<SpringBootApplication>> {
+    + {static} main(args : String[]) : void
+  }
+
+  class ConfiguracionPrestamos <<Configuration>> {
+    + validadorPrestamo() : ValidadorPrestamo
+    + prestamoGateway(url : String, apiKey : String, timeout : long) : PrestamoGateway
+    + servicioPrestamos(validador, gateway) : ServicioPrestamos
+  }
+
+  class PrestamoController <<Controller>> {
+    - servicio : ServicioPrestamos
+    + inicio() : String
+    + mostrarFormulario(modelo : Model) : String
+    + solicitarPrestamo(formulario : FormularioPrestamo, modelo : Model) : String
+  }
+
+  class FormularioPrestamo {
+    - carne : String
+    - nombreEstudiante : String
+    - codigoEquipo : String
+    - cantidad : String
+    - fechaDevolucion : String
+    + aSolicitud() : SolicitudPrestamo
+    - convertirCantidad() : Integer
+  }
+
+  class ServicioPrestamos {
+    - validador : ValidadorPrestamo
+    - gateway : PrestamoGateway
+    + solicitar(solicitud : SolicitudPrestamo) : RespuestaPrestamo
+  }
+
+  class ValidadorPrestamo {
+    + {static} ZONA_GUATEMALA : ZoneId
+    + {static} CANTIDAD_MAXIMA : int = 10
+    + {static} DIAS_MAXIMOS_PRESTAMO : int = 30
+    - reloj : Clock
+    + validar(solicitud : SolicitudPrestamo) : ResultadoValidacion
+    - validarFecha(texto : String, errores : List<String>) : void
+  }
+
+  interface PrestamoGateway {
+    + enviar(solicitud : SolicitudPrestamo) : RespuestaPrestamo
+  }
+
+  class N8nPrestamoGateway {
+    + {static} CABECERA_CLAVE : String = "X-API-Key"
+    - restClient : RestClient
+    - url : String
+    - apiKey : String
+    + enviar(solicitud : SolicitudPrestamo) : RespuestaPrestamo
+    - convertir(codigo : int, datos : RespuestaN8n) : RespuestaPrestamo
+  }
+
+  class RespuestaN8n <<record>> {
+    estado : String
+    mensaje : String
+    errores : List<String>
+    idPrestamo : Long
+    equipo : String
+    fechaDevolucion : String
+    stockDisponible : Integer
+  }
+
+  class SolicitudPrestamo <<record>> {
+    carne : String
+    nombreEstudiante : String
+    codigoEquipo : String
+    cantidad : Integer
+    fechaDevolucion : String
+    + normalizada() : SolicitudPrestamo
+  }
+
+  class ResultadoValidacion <<record>> {
+    errores : List<String>
+    + esValido() : boolean
+  }
+
+  class RespuestaPrestamo <<record>> {
+    codigoHttp : int
+    estado : String
+    mensaje : String
+    + fueAprobado() : boolean
+    + {static} rechazada(codigo : int, mensaje : String) : RespuestaPrestamo
+    + {static} error(mensaje : String) : RespuestaPrestamo
+  }
+
+  class PrestamoGatewayException {
+  }
+}
+
+class "java.lang.Exception" as Exception
+
+' --- Herencia e implementación ---
+N8nPrestamoGateway ..|> PrestamoGateway
+PrestamoGatewayException --|> Exception
+
+' --- Asociaciones (una clase guarda a otra como atributo) ---
+PrestamoController --> "1" ServicioPrestamos
+ServicioPrestamos --> "1" ValidadorPrestamo
+ServicioPrestamos --> "1" PrestamoGateway
+
+' --- Clase anidada ---
+N8nPrestamoGateway +-- RespuestaN8n
+
+' --- Dependencias (una clase usa o crea a otra) ---
+PrestamoController ..> FormularioPrestamo : recibe
+FormularioPrestamo ..> SolicitudPrestamo : crea
+ValidadorPrestamo ..> ResultadoValidacion : crea
+ServicioPrestamos ..> RespuestaPrestamo : devuelve
+PrestamoGateway ..> PrestamoGatewayException : lanza
+ConfiguracionPrestamos ..> ServicioPrestamos : crea
+ConfiguracionPrestamos ..> N8nPrestamoGateway : crea
+ConfiguracionPrestamos ..> ValidadorPrestamo : crea
+@enduml

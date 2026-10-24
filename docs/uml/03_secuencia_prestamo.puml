@@ -1,0 +1,72 @@
+@startuml secuencia_prestamo
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+skinparam ParticipantBackgroundColor #EEF3FA
+skinparam ParticipantBorderColor #1F3864
+skinparam ActorBorderColor #1F3864
+skinparam DatabaseBackgroundColor #EEF3FA
+skinparam DatabaseBorderColor #1F3864
+autonumber
+title Diagrama de secuencia\nSolicitud de préstamo desde la aplicación web
+
+actor "Encargado" as U
+participant "Navegador" as NAV
+
+box "Aplicación web (Spring Boot)" #F7F9FC
+participant "PrestamoController" as CTRL
+participant "ServicioPrestamos" as SERV
+participant "ValidadorPrestamo" as VAL
+participant "N8nPrestamoGateway" as GW
+end box
+
+box "n8n" #FFF8EE
+participant "WF1 - Ingesta" as WF1
+participant "WF2 - Procesamiento" as WF2
+end box
+
+database "PostgreSQL" as DB
+
+U -> NAV : Llena y envía el formulario
+NAV -> CTRL : POST /prestamos
+activate CTRL
+CTRL -> SERV : solicitar(solicitud)
+activate SERV
+SERV -> VAL : validar(solicitud)
+activate VAL
+VAL --> SERV : ResultadoValidacion
+deactivate VAL
+
+alt Datos inválidos
+  SERV --> CTRL : RespuestaPrestamo (400, lista de errores)
+  note right of SERV : n8n nunca se contacta
+else Datos válidos
+  SERV -> GW : enviar(solicitud)
+  activate GW
+  note right of GW
+    Si n8n no responde en 10 s,
+    el servicio devuelve un error 503
+  end note
+  GW -> WF1 : POST /webhook/prestamos\ncon cabecera X-API-Key
+  activate WF1
+  WF1 -> WF1 : Validar datos
+  WF1 -> WF2 : Ejecutar sub-workflow
+  activate WF2
+  WF2 -> DB : UPDATE equipos + INSERT prestamos\n(operación atómica)
+  activate DB
+  DB --> WF2 : resultado (aprobado o no)
+  deactivate DB
+  WF2 -> DB : INSERT auditoria
+  WF2 --> WF1 : APROBADO o RECHAZADO
+  deactivate WF2
+  WF1 --> GW : 201 o 409 (JSON)
+  deactivate WF1
+  GW --> SERV : RespuestaPrestamo
+  deactivate GW
+  SERV --> CTRL : RespuestaPrestamo
+end
+
+deactivate SERV
+CTRL --> NAV : prestamo.html con el resultado
+deactivate CTRL
+NAV --> U : Cuadro verde, naranja o rojo
+@enduml

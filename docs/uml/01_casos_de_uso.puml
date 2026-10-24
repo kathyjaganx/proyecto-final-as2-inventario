@@ -1,0 +1,43 @@
+@startuml casos_de_uso
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #EEF3FA
+  BorderColor #1F3864
+}
+skinparam actor {
+  BorderColor #1F3864
+}
+title Diagrama de casos de uso\nControl de inventario y préstamos de laboratorio
+
+actor "Encargado del\nlaboratorio" as Encargado
+actor "Reloj del sistema\n(7:00 a. m.)" as Reloj
+actor "Administrador\ndel sistema" as Admin
+
+rectangle "Sistema de control de préstamos" {
+  usecase "Solicitar préstamo" as UC1
+  usecase "Validar datos\nde la solicitud" as UC2
+  usecase "Registrar préstamo y\ndescontar stock" as UC3
+  usecase "Rechazar solicitud" as UC4
+  usecase "Registrar en bitácora\nde auditoría" as UC5
+  usecase "Detectar préstamos\nvencidos" as UC6
+  usecase "Generar reporte CSV" as UC7
+  usecase "Consultar reportes\ny auditoría" as UC8
+  usecase "Revisar errores\nregistrados" as UC9
+  usecase "Configurar credenciales\ny clave de acceso" as UC10
+}
+
+Encargado --> UC1
+Reloj --> UC6
+Admin --> UC8
+Admin --> UC9
+Admin --> UC10
+
+UC1 ..> UC2 : <<include>>
+UC1 ..> UC3 : <<include>>
+UC1 ..> UC5 : <<include>>
+UC4 ..> UC1 : <<extend>>\n(datos inválidos\no sin stock)
+UC6 ..> UC7 : <<include>>
+UC6 ..> UC5 : <<include>>
+@enduml

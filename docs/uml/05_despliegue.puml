@@ -1,0 +1,58 @@
+@startuml despliegue
+set separator none
+skinparam shadowing false
+skinparam NodeBackgroundColor #EEF3FA
+skinparam NodeBorderColor #1F3864
+skinparam ComponentBackgroundColor #FFFFFF
+skinparam ComponentBorderColor #1F3864
+skinparam DatabaseBackgroundColor #FFFFFF
+skinparam ArrowColor #1F3864
+title Diagrama de despliegue\nEntorno local del sistema de préstamos
+
+actor "Encargado del\nlaboratorio" as U
+
+node "Computadora local (Windows 11)" as PC {
+
+  node "Navegador web" as NAV
+
+  node "Máquina virtual de Java (JVM)" as JVM {
+    artifact "app-prestamos-0.2.0.jar\nSpring Boot + Tomcat\npuerto 8080" as APP
+  }
+
+  file ".env\n(credenciales)" as ENV
+  folder "Carpeta reportes/" as REP
+
+  node "Docker Desktop" as DOCKER {
+
+    node "Contenedor inventario_n8n\nimagen n8nio/n8n · puerto 5678" as N8N {
+      component "WF1 - Ingesta" as WF1
+      component "WF2 - Procesamiento" as WF2
+      component "WF3 - Salida" as WF3
+      component "WF4 - Errores" as WF4
+    }
+
+    node "Contenedor inventario_db\nimagen postgres:16 · puerto 5432" as PGC {
+      database "inventario_lab\nequipos · prestamos\nauditoria · errores" as DB
+    }
+
+    storage "Volumen n8n_data" as V1
+    storage "Volumen postgres_data" as V2
+  }
+}
+
+U --> NAV : usa
+NAV --> APP : HTTP :8080
+APP --> WF1 : HTTP POST :5678\ncabecera X-API-Key
+WF1 --> WF2 : sub-workflow
+N8N --> DB : TCP :5432\nred interna de Docker
+WF3 --> REP : escribe CSV\n(montado en /reportes)
+N8N --> V1 : workflows y\ncredenciales cifradas
+PGC --> V2 : datos persistentes
+ENV ..> N8N : variables de entorno
+ENV ..> PGC : variables de entorno
+
+note right of APP
+  La clave se lee de la
+  variable de entorno N8N_API_KEY
+end note
+@enduml

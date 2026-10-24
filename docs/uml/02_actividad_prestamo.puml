@@ -1,0 +1,58 @@
+@startuml actividad_prestamo
+skinparam shadowing false
+skinparam ActivityBackgroundColor #EEF3FA
+skinparam ActivityBorderColor #1F3864
+skinparam ActivityDiamondBackgroundColor #FFF4E5
+skinparam ActivityDiamondBorderColor #E08600
+title Diagrama de actividad\nProceso de solicitud de préstamo
+
+|Encargado del laboratorio|
+start
+:Llenar formulario de préstamo\n(carné, nombre, equipo, cantidad, fecha);
+:Enviar solicitud;
+
+|WF1 - Ingesta|
+if (¿Clave X-API-Key válida?) then (no)
+  :Responder 403\nAcceso denegado;
+  |Encargado del laboratorio|
+  :Ver mensaje de acceso denegado;
+  stop
+else (sí)
+endif
+
+|WF1 - Ingesta|
+:Validar las 5 reglas\n(carné, nombre, código, cantidad, fecha);
+if (¿Datos válidos?) then (no)
+  :Registrar rechazo en auditoría;
+  :Responder 400 con la lista de errores;
+  |Encargado del laboratorio|
+  :Corregir los datos indicados;
+  stop
+else (sí)
+endif
+
+|WF2 - Procesamiento|
+:Descontar stock y registrar préstamo\n(operación atómica en PostgreSQL);
+note right
+  Si ocurre un error inesperado,
+  el WF4 lo registra en la tabla errores
+end note
+if (¿Equipo existe y hay stock suficiente?) then (sí)
+  :Registrar éxito en auditoría;
+  :Preparar respuesta APROBADO\ncon el número de préstamo;
+else (no)
+  :Registrar rechazo con su motivo\nen auditoría;
+  :Preparar respuesta RECHAZADO\ncon el motivo;
+endif
+
+|WF1 - Ingesta|
+:Responder resultado\n(201 aprobado o 409 rechazado);
+
+|Encargado del laboratorio|
+if (¿Préstamo aprobado?) then (sí)
+  :Entregar el equipo al estudiante;
+else (no)
+  :Informar al estudiante\n(sin stock o equipo inexistente);
+endif
+stop
+@enduml
