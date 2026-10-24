@@ -44,6 +44,53 @@ Flujo principal: **navegador → aplicación web → webhook de n8n (WF1 → WF2
 | `auditoria` | Bitácora de todas las operaciones y su resultado |
 | `errores` | Fallos capturados por el WF4 |
 
+## Diagramas
+
+Todos los diagramas están en la carpeta `docs/`. Se escribieron como texto ([Mermaid](https://mermaid.js.org) y [PlantUML](https://plantuml.com)), así que su código fuente está versionado junto a cada imagen.
+
+### Arquitectura y flujo principal
+
+| Diagrama | Código fuente |
+|---|---|
+| Arquitectura del sistema | `docs/diagrama_arquitectura.mmd` |
+| Flujo principal de una solicitud | `docs/diagrama_flujo_principal.mmd` |
+
+![Diagrama de arquitectura](docs/diagrama_arquitectura.png)
+
+![Diagrama del flujo principal](docs/diagrama_flujo_principal.png)
+
+### Diagramas UML
+
+| # | Diagrama | Qué muestra | Código fuente |
+|---|---|---|---|
+| 1 | Casos de uso | Quién usa el sistema y qué puede hacer | `docs/uml/01_casos_de_uso.puml` |
+| 2 | Actividad | El proceso de un préstamo con sus decisiones | `docs/uml/02_actividad_prestamo.puml` |
+| 3 | Secuencia | En qué orden se comunican las piezas | `docs/uml/03_secuencia_prestamo.puml` |
+| 4 | Clases | Las clases Java de la aplicación web | `docs/uml/04_clases.puml` |
+| 5 | Despliegue | Dónde corre cada pieza y cómo se conectan | `docs/uml/05_despliegue.puml` |
+
+#### 1. Casos de uso
+
+![Diagrama de casos de uso](docs/uml/01_casos_de_uso.png)
+
+#### 2. Actividad
+
+![Diagrama de actividad](docs/uml/02_actividad_prestamo.png)
+
+#### 3. Secuencia
+
+![Diagrama de secuencia](docs/uml/03_secuencia_prestamo.png)
+
+#### 4. Clases
+
+![Diagrama de clases](docs/uml/04_clases.png)
+
+#### 5. Despliegue
+
+![Diagrama de despliegue](docs/uml/05_despliegue.png)
+
+Para editar un diagrama UML, abrir su archivo `.puml`, pegar el contenido en [plantuml.com](https://www.plantuml.com/plantuml/uml/) y exportar la imagen en PNG.
+
 ## Requisitos
 
 - Windows 10/11, macOS o Linux
@@ -55,24 +102,24 @@ Flujo principal: **navegador → aplicación web → webhook de n8n (WF1 → WF2
 
 1. Clonar el repositorio:
 
-```bash
+   ```bash
    git clone https://github.com/kathyjaganx/proyecto-final-as2-inventario.git
    cd proyecto-final-as2-inventario
-```
+   ```
 
 2. Crear el archivo de credenciales a partir de la plantilla:
 
-```bash
+   ```bash
    cp .env.example .env
-```
+   ```
 
    Editar `.env` y poner un usuario y una contraseña para PostgreSQL, y una clave aleatoria de 32 caracteres en `N8N_ENCRYPTION_KEY`.
 
 3. Levantar el entorno:
 
-```bash
+   ```bash
    docker compose up -d
-```
+   ```
 
    La primera vez, PostgreSQL ejecuta `db/init.sql`, que crea las tablas y carga 5 equipos de prueba.
 
@@ -235,6 +282,7 @@ start target\site\jacoco\index.html
 ├── pruebas/             Casos de prueba del sistema
 ├── reportes/            Reportes CSV generados por el WF3
 ├── docs/                Documento técnico y diagramas
+│   └── uml/             Diagramas UML (código PlantUML e imágenes)
 └── app-prestamos/       Aplicación web Spring Boot
     ├── pom.xml
     └── src/
