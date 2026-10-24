@@ -2,6 +2,7 @@ package gt.umg.inventario.prestamos;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasProperty;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
@@ -14,8 +15,10 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -24,6 +27,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -32,10 +39,12 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 /**
  * Pruebas del PrestamoController con MockMvc.
  * Se simula el navegador y el ServicioPrestamos: no hace falta servidor ni n8n.
+ * El generador de PDF es el real, para comprobar el archivo que se descarga.
  *
  * Autora: Irma Yaritza Katiuxca Jagan Xol - 4090-23-9748
  */
 @WebMvcTest(PrestamoController.class)
+@Import(GeneradorComprobantePdf.class)
 @TestPropertySource(properties = "n8n.api-key=clave-de-prueba")
 @DisplayName("PrestamoController")
 class PrestamoControllerTest {
@@ -54,6 +63,13 @@ class PrestamoControllerTest {
                 .param("codigoEquipo", codigoEquipo)
                 .param("cantidad", cantidad)
                 .param("fechaDevolucion", "2026-10-27");
+    }
+
+    /** Respuesta aprobada como la devuelve el gateway real: con el detalle del préstamo. */
+    private RespuestaPrestamo aprobadaConDetalle() {
+        return new RespuestaPrestamo(201, RespuestaPrestamo.APROBADO,
+                "Prestamo registrado correctamente. Número de préstamo: 6, equipo: Kit Arduino UNO",
+                new DetallePrestamo(6L, "Kit Arduino UNO", "2026-10-27"));
     }
 
     // ---------- Navegación ----------
@@ -116,7 +132,7 @@ class PrestamoControllerTest {
     }
 
     @Test
-    @DisplayName("Rechazado: muestra el cuadro naranja y conserva los datos escritos")
+    @DisplayName("Rechazado: muestra el cuadro naranja, conserva los datos y no ofrece comprobante")
     void prestamoRechazadoConservaDatos() throws Exception {
         when(servicio.solicitar(any())).thenReturn(
                 RespuestaPrestamo.rechazada(409, "Stock insuficiente para la cantidad solicitada"));
@@ -125,8 +141,11 @@ class PrestamoControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("formulario", hasProperty("carne", is("4090-23-5555"))))
                 .andExpect(model().attribute("formulario", hasProperty("codigoEquipo", is("PRO-001"))))
+                .andExpect(model().attributeDoesNotExist("comprobanteDisponible"))
+                .andExpect(request().sessionAttribute(PrestamoController.SESION_COMPROBANTE, nullValue()))
                 .andExpect(content().string(containsString("Solicitud rechazada")))
-                .andExpect(content().string(containsString("Stock insuficiente")));
+                .andExpect(content().string(containsString("Stock insuficiente")))
+                .andExpect(content().string(not(containsString("Descargar comprobante"))));
     }
 
     @Test
@@ -175,5 +194,69 @@ class PrestamoControllerTest {
         ArgumentCaptor<SolicitudPrestamo> captor = ArgumentCaptor.forClass(SolicitudPrestamo.class);
         verify(servicio).solicitar(captor.capture());
         assertNull(captor.getValue().cantidad());
+    }
+
+    // ---------- Comprobante en PDF ----------
+
+    @Test
+    @DisplayName("Aprobado con detalle: muestra el botón y guarda el comprobante en la sesión")
+    void aprobadoGuardaComprobante() throws Exception {
+        when(servicio.solicitar(any())).thenReturn(aprobadaConDetalle());
+        MockHttpSession sesion = new MockHttpSession();
+
+        navegador.perform(enviarFormulario("ard-001", "1").session(sesion))
+                .andExpect(model().attribute("comprobanteDisponible", true))
+                .andExpect(request().sessionAttribute(PrestamoController.SESION_COMPROBANTE,
+                        instanceOf(ComprobantePrestamo.class)))
+                .andExpect(content().string(containsString("Descargar comprobante (PDF)")))
+                .andExpect(content().string(containsString("/prestamos/comprobante")));
+
+        ComprobantePrestamo guardado =
+                (ComprobantePrestamo) sesion.getAttribute(PrestamoController.SESION_COMPROBANTE);
+        assertEquals(6L, guardado.numeroPrestamo());
+        assertEquals("ARD-001", guardado.codigoEquipo());
+        assertEquals("Pedro Tzul", guardado.nombreEstudiante());
+        assertEquals("Kit Arduino UNO", guardado.equipo());
+        assertEquals("2026-10-27", guardado.fechaDevolucion());
+    }
+
+    @Test
+    @DisplayName("Descarga el comprobante como archivo PDF adjunto")
+    void descargaComprobantePdf() throws Exception {
+        when(servicio.solicitar(any())).thenReturn(aprobadaConDetalle());
+        MockHttpSession sesion = new MockHttpSession();
+        navegador.perform(enviarFormulario("ARD-001", "1").session(sesion));
+
+        byte[] pdf = navegador.perform(get("/prestamos/comprobante").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("attachment")))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                        containsString("comprobante_prestamo_6.pdf")))
+                .andReturn().getResponse().getContentAsByteArray();
+
+        assertEquals("%PDF", new String(pdf, 0, 4));
+    }
+
+    @Test
+    @DisplayName("Sin préstamo aprobado en la sesión, la descarga regresa al formulario")
+    void descargaSinComprobanteRedirige() throws Exception {
+        navegador.perform(get("/prestamos/comprobante"))
+                .andExpect(status().isSeeOther())
+                .andExpect(redirectedUrl("/prestamos"));
+    }
+
+    @Test
+    @DisplayName("Una solicitud nueva rechazada borra el comprobante anterior")
+    void nuevaSolicitudBorraComprobanteAnterior() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        when(servicio.solicitar(any())).thenReturn(aprobadaConDetalle());
+        navegador.perform(enviarFormulario("ARD-001", "1").session(sesion));
+
+        when(servicio.solicitar(any())).thenReturn(RespuestaPrestamo.rechazada(409, "Stock insuficiente"));
+        navegador.perform(enviarFormulario("PRO-001", "1").session(sesion));
+
+        navegador.perform(get("/prestamos/comprobante").session(sesion))
+                .andExpect(status().isSeeOther());
     }
 }

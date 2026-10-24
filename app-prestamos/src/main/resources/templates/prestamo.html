@@ -52,6 +52,11 @@
         .exito   { background: var(--exito-fondo);   border-left-color: var(--exito-borde); }
         .rechazo { background: var(--rechazo-fondo); border-left-color: var(--rechazo-borde); }
         .error   { background: var(--error-fondo);   border-left-color: var(--error-borde); }
+        .boton-pdf {
+            display: inline-block; margin-top: .9rem; padding: .55rem 1rem; border-radius: 6px;
+            background: var(--exito-borde); color: #fff; font-weight: 600; text-decoration: none;
+        }
+        .boton-pdf:hover { filter: brightness(1.1); }
         footer { text-align: center; color: var(--suave); font-size: .8rem; }
         @media (max-width: 480px) { .fila { grid-template-columns: 1fr; } }
     </style>
@@ -76,6 +81,9 @@
             <li th:each="parte : ${#strings.arraySplit(respuesta.mensaje(), ';')}"
                 th:text="${#strings.trim(parte)}">Mensaje</li>
         </ul>
+        <a th:if="${comprobanteDisponible}" class="boton-pdf" th:href="@{/prestamos/comprobante}">
+            📄 Descargar comprobante (PDF)
+        </a>
         <p class="codigo" th:text="|Código de respuesta: ${respuesta.codigoHttp()}|">Código</p>
     </section>
 

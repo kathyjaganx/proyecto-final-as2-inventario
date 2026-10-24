@@ -77,6 +77,7 @@ public class N8nPrestamoGateway implements PrestamoGateway {
         }
 
         String mensaje = datos.mensaje() == null ? "" : datos.mensaje();
+        DetallePrestamo detalle = null;
 
         if (datos.errores() != null && !datos.errores().isEmpty()) {
             mensaje = String.join("; ", datos.errores());
@@ -84,11 +85,12 @@ public class N8nPrestamoGateway implements PrestamoGateway {
             mensaje = mensaje + ". Número de préstamo: " + datos.idPrestamo()
                     + ", equipo: " + datos.equipo()
                     + ", devolver a más tardar el " + datos.fechaDevolucion();
+            detalle = new DetallePrestamo(datos.idPrestamo(), datos.equipo(), datos.fechaDevolucion());
         } else if (datos.stockDisponible() != null && datos.stockDisponible() > 0) {
             mensaje = mensaje + " (disponibles: " + datos.stockDisponible() + ")";
         }
 
-        return new RespuestaPrestamo(codigo, datos.estado(), mensaje);
+        return new RespuestaPrestamo(codigo, datos.estado(), mensaje, detalle);
     }
 
     private static String requerido(String valor, String mensajeError) {

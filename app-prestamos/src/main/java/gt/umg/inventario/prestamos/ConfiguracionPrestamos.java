@@ -41,4 +41,9 @@ public class ConfiguracionPrestamos {
     public ServicioPrestamos servicioPrestamos(ValidadorPrestamo validador, PrestamoGateway gateway) {
         return new ServicioPrestamos(validador, gateway);
     }
+
+    @Bean
+    public GeneradorComprobantePdf generadorComprobantePdf() {
+        return new GeneradorComprobantePdf();
+    }
 }
