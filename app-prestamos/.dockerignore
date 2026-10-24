@@ -1,0 +1,6 @@
+# Se regenera dentro del contenedor
+target/
+
+# Configuración local del editor
+.vscode/
+.idea/

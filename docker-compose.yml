@@ -42,6 +42,20 @@ services:
       postgres:
         condition: service_healthy
 
+  app:
+    build: ./app-prestamos
+    image: app-prestamos:0.2.0
+    container_name: inventario_app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      N8N_API_KEY: ${N8N_API_KEY}
+      N8N_WEBHOOK_URL: http://n8n:5678/webhook/prestamos
+      TZ: America/Guatemala
+    depends_on:
+      - n8n
+
 volumes:
   postgres_data:
   n8n_data:
