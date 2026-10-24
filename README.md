@@ -13,18 +13,23 @@ Docente: Ing. Edgar Raúl Molina Rey
 
 Sistema que automatiza, en un entorno 100 % local, el control de préstamos de equipo de un laboratorio. Usa **n8n** para los workflows, **PostgreSQL** para la persistencia, **Docker** para el despliegue y una **aplicación web en Spring Boot** como interfaz para los usuarios.
 
-El sistema recibe solicitudes de préstamo, valida los datos, verifica el stock disponible, registra el préstamo, descuenta el inventario y genera un reporte diario de préstamos vencidos. Todas las operaciones quedan registradas en una bitácora de auditoría, y los errores se capturan en una tabla aparte.
+El sistema recibe solicitudes de préstamo, valida los datos, verifica el stock disponible, registra el préstamo, descuenta el inventario, entrega un **comprobante en PDF** de cada préstamo aprobado y genera un reporte diario de préstamos vencidos. Todas las operaciones quedan registradas en una bitácora de auditoría, y los errores se capturan en una tabla aparte.
 
 ## Arquitectura
 
-| Componente | Tecnología | Puerto |
-|---|---|---|
-| Aplicación web | Spring Boot 4.1 + Thymeleaf (`app-prestamos`) | 8080 |
-| Motor de workflows | n8n (contenedor `inventario_n8n`) | 5678 |
-| Base de datos | PostgreSQL 16 (contenedor `inventario_db`) | 5432 |
-| Reportes | Carpeta `reportes/` compartida con n8n | — |
+Todo corre en **tres contenedores Docker** que arrancan solos al iniciar Docker Desktop (`restart: unless-stopped`):
 
-Flujo principal: **navegador → aplicación web → webhook de n8n (WF1 → WF2) → PostgreSQL → respuesta**.
+| Contenedor | Tecnología | Puerto |
+|---|---|---|
+| `inventario_app` | Aplicación web: Spring Boot 4.1 + Thymeleaf + Apache PDFBox | 8080 |
+| `inventario_n8n` | Motor de workflows n8n | 5678 |
+| `inventario_db` | PostgreSQL 16 | 5432 |
+
+La carpeta `reportes/` se comparte con n8n para los archivos CSV del WF3.
+
+Flujo principal: **navegador → aplicación web → webhook de n8n (WF1 → WF2) → PostgreSQL → respuesta y comprobante PDF**.
+
+Dentro de Docker, los contenedores se comunican por **nombre de servicio**: la aplicación llama a `http://n8n:5678` y n8n se conecta a `postgres:5432`.
 
 ### Workflows
 
@@ -43,6 +48,18 @@ Flujo principal: **navegador → aplicación web → webhook de n8n (WF1 → WF2
 | `prestamos` | Préstamos registrados y su estado (ACTIVO, DEVUELTO, VENCIDO) |
 | `auditoria` | Bitácora de todas las operaciones y su resultado |
 | `errores` | Fallos capturados por el WF4 |
+
+### Equipos registrados
+
+| Código | Equipo | Stock inicial |
+|---|---|---|
+| `LAP-001` | Laptop Dell Latitude | 5 |
+| `PRO-001` | Proyector Epson | 2 |
+| `MUL-001` | Multímetro digital | 8 |
+| `ARD-001` | Kit Arduino UNO | 10 |
+| `HDM-001` | Cable HDMI 3m | 15 |
+
+Cualquier otro código, aunque tenga el formato correcto, se rechaza con 409.
 
 ## Diagramas
 
@@ -67,7 +84,7 @@ Todos los diagramas están en la carpeta `docs/`. Se escribieron como texto ([Me
 | 2 | Actividad | El proceso de un préstamo con sus decisiones | `docs/uml/02_actividad_prestamo.puml` |
 | 3 | Secuencia | En qué orden se comunican las piezas | `docs/uml/03_secuencia_prestamo.puml` |
 | 4 | Clases | Las clases Java de la aplicación web | `docs/uml/04_clases.puml` |
-| 5 | Despliegue | Dónde corre cada pieza y cómo se conectan | `docs/uml/05_despliegue.puml` |
+| 5 | Despliegue | Los tres contenedores y cómo se conectan | `docs/uml/05_despliegue.puml` |
 
 #### 1. Casos de uso
 
@@ -96,9 +113,9 @@ Para editar un diagrama UML, abrir su archivo `.puml`, pegar el contenido en [pl
 - Windows 10/11, macOS o Linux
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 - [Git](https://git-scm.com/)
-- Para la aplicación web: **Java 21 o superior** y **Maven 3.9 o superior**
+- Solo para desarrollar y ejecutar las pruebas unitarias: **Java 21 o superior** y **Maven 3.9 o superior**
 
-## Instalación del entorno n8n
+## Instalación
 
 1. Clonar el repositorio:
 
@@ -113,7 +130,10 @@ Para editar un diagrama UML, abrir su archivo `.puml`, pegar el contenido en [pl
    cp .env.example .env
    ```
 
-   Editar `.env` y poner un usuario y una contraseña para PostgreSQL, y una clave aleatoria de 32 caracteres en `N8N_ENCRYPTION_KEY`.
+   Editar `.env` y poner:
+   - Usuario y contraseña para PostgreSQL.
+   - Una clave aleatoria de 32 caracteres en `N8N_ENCRYPTION_KEY`.
+   - Una clave aleatoria en `N8N_API_KEY`. Será la clave del webhook: se usa la **misma** al crear la credencial en n8n (paso de configuración 1).
 
 3. Levantar el entorno:
 
@@ -121,7 +141,7 @@ Para editar un diagrama UML, abrir su archivo `.puml`, pegar el contenido en [pl
    docker compose up -d
    ```
 
-   La primera vez, PostgreSQL ejecuta `db/init.sql`, que crea las tablas y carga 5 equipos de prueba.
+   La primera vez Docker construye la imagen de la aplicación web a partir de `app-prestamos/Dockerfile` (tarda unos minutos), y PostgreSQL ejecuta `db/init.sql`, que crea las tablas y carga los 5 equipos.
 
 4. Entrar a **http://localhost:5678** y crear la cuenta de administrador de n8n.
 
@@ -129,7 +149,7 @@ Para editar un diagrama UML, abrir su archivo `.puml`, pegar el contenido en [pl
 
 1. **Crear las credenciales** en n8n (+ → Credential):
    - **Postgres Inventario** (tipo Postgres): host `postgres`, base de datos, usuario y contraseña del `.env`, puerto `5432`, SSL `Disable`.
-   - **API Key Prestamos** (tipo Header Auth): nombre `X-API-Key` y como valor una clave aleatoria.
+   - **API Key Prestamos** (tipo Header Auth): nombre `X-API-Key` y como valor **la misma clave** de `N8N_API_KEY` del `.env`.
 
 2. **Importar los workflows** desde la carpeta `workflows/`, en este orden: `WF04_Errores.json`, `WF02_Procesamiento.json`, `WF01_Ingesta.json`, `WF03_Salida.json`. Para cada uno: + → Workflow → (...) → Import from File.
 
@@ -141,33 +161,41 @@ Para editar un diagrama UML, abrir su archivo `.puml`, pegar el contenido en [pl
 
 6. Publicar los cuatro workflows.
 
-## Aplicación web (`app-prestamos`)
+## Aplicación web
 
-Interfaz web para registrar préstamos sin usar la terminal. Envía cada solicitud al webhook del WF1 y muestra el resultado: **verde** (aprobado), **naranja** (rechazado) o **rojo** (error de comunicación).
+Abrir **http://localhost:8080**. Muestra un formulario de préstamo y el resultado: **verde** (aprobado), **naranja** (rechazado) o **rojo** (error de comunicación).
+
+Cuando el préstamo se aprueba, aparece el botón **Descargar comprobante (PDF)**. El comprobante incluye el número de préstamo, el estudiante, el equipo, la cantidad, la fecha de devolución y líneas para las firmas del encargado y del estudiante. Por seguridad, solo se puede descargar el comprobante del préstamo recién aprobado en esa misma sesión del navegador.
 
 ### Componentes
 
 | Clase | Función |
 |---|---|
-| `PrestamoController` | Atiende el formulario en `/prestamos` |
+| `PrestamoController` | Atiende el formulario en `/prestamos` y la descarga en `/prestamos/comprobante` |
 | `ServicioPrestamos` | Valida la solicitud y solo si es válida la envía a n8n |
 | `ValidadorPrestamo` | Las mismas 5 reglas de validación del WF1 |
 | `N8nPrestamoGateway` | Cliente HTTP que llama al webhook con la cabecera `X-API-Key` |
+| `GeneradorComprobantePdf` | Dibuja el comprobante en PDF con Apache PDFBox |
 | `ConfiguracionPrestamos` | Conecta las piezas (inyección de dependencias) |
 | `prestamo.html` | Página Thymeleaf con el formulario y el resultado |
 
 ### Configuración
 
-La aplicación lee su configuración de variables de entorno. **La clave nunca se escribe en el código**: si no se configura `N8N_API_KEY`, la aplicación no arranca e indica qué falta.
+| Variable (en `.env`) | Valor |
+|---|---|
+| `N8N_API_KEY` | La misma clave de la credencial **API Key Prestamos** de n8n. Si falta, la aplicación no arranca e indica qué falta |
 
-| Variable | Obligatoria | Valor |
-|---|---|---|
-| `N8N_API_KEY` | Sí | La misma clave de la credencial **API Key Prestamos** de n8n |
-| `N8N_WEBHOOK_URL` | No | Por defecto `http://localhost:5678/webhook/prestamos` |
+La URL del webhook la define `docker-compose.yml` (`http://n8n:5678/webhook/prestamos`).
 
-### Ejecución
+### Si se cambia el código
 
-Con el entorno de n8n encendido y los workflows publicados (PowerShell):
+Volver a construir y reiniciar solo el contenedor de la aplicación:
+
+```bash
+docker compose up -d --build app
+```
+
+### Ejecución sin Docker (desarrollo)
 
 ```powershell
 cd app-prestamos
@@ -175,14 +203,7 @@ $env:N8N_API_KEY = "CLAVE_DEL_WEBHOOK"
 mvn spring-boot:run
 ```
 
-Abrir **http://localhost:8080**. Para detenerla: **Ctrl + C**.
-
-También se puede empaquetar y ejecutar como un solo archivo:
-
-```powershell
-mvn verify
-java -jar target\app-prestamos-0.2.0.jar
-```
+Antes, detener el contenedor `inventario_app` para liberar el puerto 8080: `docker compose stop app`.
 
 ## Uso del webhook (sin la aplicación web)
 
@@ -239,7 +260,7 @@ Las pruebas **no necesitan Docker ni n8n**: las dependencias externas se simulan
 
 ```powershell
 cd app-prestamos
-mvn verify
+mvn clean verify
 ```
 
 `mvn verify` ejecuta las pruebas, genera el reporte de cobertura y **falla si la cobertura de líneas baja del 80 %**.
@@ -249,11 +270,20 @@ mvn verify
 | `ValidadorPrestamoTest` | 48 | JUnit (parametrizadas) | Las 5 reglas, con valores válidos, inválidos y límite |
 | `ServicioPrestamosTest` | 10 | JUnit + Mockito | Que los datos inválidos nunca lleguen a n8n y el manejo de fallos |
 | `N8nPrestamoGatewayTest` | 14 | MockRestServiceServer | La petición HTTP exacta y la interpretación de cada respuesta de n8n |
-| `PrestamoControllerTest` | 9 | MockMvc + @MockitoBean | Navegación, formulario, colores del resultado y conservación de datos |
+| `PrestamoControllerTest` | 13 | MockMvc + @MockitoBean | Navegación, formulario, colores del resultado, sesión y descarga del comprobante |
+| `GeneradorComprobantePdfTest` | 6 | JUnit + PDFBox | Que el PDF sea válido y contenga todos los datos, con tildes y ñ |
 | `AppPrestamosApplicationTest` | 1 | @SpringBootTest | Que la aplicación completa arranca y conecta sus piezas |
-| **Total** | **82** | | |
+| **Total** | **92** | | |
 
-**Cobertura (JaCoCo):** 99 % de instrucciones y 98 % de ramas.
+**Cobertura (JaCoCo):**
+
+| Métrica | Resultado |
+|---|---|
+| Instrucciones | 1 255 de 1 267 (99 %) |
+| Ramas | 77 de 78 (98 %) |
+| Líneas | 250 de 254 |
+| Métodos | 60 de 61 |
+| Clases | 15 de 15 |
 
 Para ver el reporte de cobertura:
 
@@ -263,11 +293,13 @@ start target\site\jacoco\index.html
 
 ## Seguridad
 
-- **Credenciales en variables de entorno:** ninguna contraseña está escrita en el código. El archivo `.env` está excluido del repositorio con `.gitignore`, y la aplicación web lee la clave de `N8N_API_KEY`.
+- **Credenciales en variables de entorno:** ninguna contraseña ni clave está escrita en el código. Todas viven en `.env`, que está excluido del repositorio con `.gitignore`.
 - **Control de acceso:** el webhook exige la cabecera `X-API-Key` (Header Auth).
 - **Validación de entradas en dos capas:** la aplicación web y el WF1 aplican las mismas reglas. Los datos inválidos se rechazan antes de llegar a la base de datos.
 - **Protección contra inyección SQL:** todas las consultas con datos del usuario usan parámetros o el modo Insert de n8n.
 - **Consistencia de datos:** restricciones `CHECK` en la base de datos y operación atómica para registrar el préstamo y descontar el stock.
+- **Comprobantes no falsificables:** los datos del comprobante se guardan en la sesión del servidor a partir de lo que confirmó n8n; el navegador nunca los envía.
+- **Contenedor sin privilegios:** la aplicación web corre con un usuario sin permisos de administrador (`appuser`), en una imagen que solo contiene Java y el `.jar`.
 - **Acceso a archivos restringido:** n8n solo puede escribir en la carpeta `reportes/` (`N8N_RESTRICT_FILE_ACCESS_TO`).
 - **Credenciales cifradas en n8n** con `N8N_ENCRYPTION_KEY`.
 - **Tiempo máximo de espera:** la aplicación web corta la conexión con n8n a los 10 segundos y muestra un mensaje claro.
@@ -275,7 +307,7 @@ start target\site\jacoco\index.html
 ## Estructura del repositorio
 
 ```
-├── docker-compose.yml   Definición de los contenedores
+├── docker-compose.yml   Definición de los tres contenedores
 ├── .env.example         Plantilla de variables de entorno
 ├── db/init.sql          Creación de tablas y datos iniciales
 ├── workflows/           Workflows exportados de n8n (WF01 a WF04)
@@ -284,6 +316,7 @@ start target\site\jacoco\index.html
 ├── docs/                Documento técnico y diagramas
 │   └── uml/             Diagramas UML (código PlantUML e imágenes)
 └── app-prestamos/       Aplicación web Spring Boot
+    ├── Dockerfile       Imagen de la aplicación (dos etapas)
     ├── pom.xml
     └── src/
         ├── main/java/       Código de la aplicación
@@ -295,9 +328,10 @@ start target\site\jacoco\index.html
 
 | Acción | Comando |
 |---|---|
-| Encender el entorno | `docker compose start` |
+| Encender todo | `docker compose start` |
 | Apagar sin borrar datos | `docker compose stop` |
 | Ver estado | `docker ps` |
+| Ver el registro de la aplicación web | `docker logs inventario_app --tail 30` |
+| Reconstruir la aplicación tras un cambio | `docker compose up -d --build app` |
 | Reiniciar la base desde cero (borra datos) | `docker compose down -v` y luego `docker compose up -d` |
-| Arrancar la aplicación web | `cd app-prestamos` y `mvn spring-boot:run` |
-| Ejecutar pruebas y cobertura | `cd app-prestamos` y `mvn verify` |
+| Ejecutar pruebas y cobertura | `cd app-prestamos` y `mvn clean verify` |
