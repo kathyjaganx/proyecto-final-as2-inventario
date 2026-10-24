@@ -8,8 +8,8 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.2,
       "position": [
-        -800,
-        -448
+        -848,
+        -464
       ],
       "id": "1bbcedb0-9a3d-4882-a638-4e57baa51790",
       "name": "When Executed by Another Workflow"
@@ -17,16 +17,16 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH equipo AS (\n  UPDATE equipos\n  SET stock_disponible = stock_disponible - $2\n  WHERE codigo = $1\n    AND activo = TRUE\n    AND stock_disponible >= $2\n  RETURNING id_equipo, nombre, stock_disponible\n),\nnuevo AS (\n  INSERT INTO prestamos (carne, nombre_estudiante, id_equipo, cantidad, fecha_devolucion_esperada)\n  SELECT $3, $4, id_equipo, $2, $5::date\n  FROM equipo\n  RETURNING id_prestamo\n)\nSELECT\n  (SELECT COUNT(*) FROM equipo) > 0                                 AS aprobado,\n  (SELECT id_prestamo FROM nuevo)                                   AS id_prestamo,\n  (SELECT nombre FROM equipo)                                       AS equipo,\n  (SELECT stock_disponible FROM equipo)                             AS stock_restante,\n  EXISTS (SELECT 1 FROM equipos WHERE codigo = $1 AND activo = TRUE) AS equipo_existe,\n  (SELECT stock_disponible FROM equipos WHERE codigo = $1)          AS stock_antes;",
+        "query": "WITH equipo AS (\n  UPDATE equipos\n  SET stock_disponible = stock_disponible - $2\n  WHERE codigo = $1\n    AND activo = TRUE\n    AND stock_disponible >= $2\n  RETURNING id_equipo, nombre, stock_disponible\n),\nnuevo AS (\n  INSERT INTO prestamos (carne, nombre_estudiante, telefono, id_equipo, cantidad, fecha_devolucion_esperada)\n  SELECT $3, $4, $6, id_equipo, $2, $5::date\n  FROM equipo\n  RETURNING id_prestamo\n)\nSELECT\n  (SELECT COUNT(*) FROM equipo) > 0                                 AS aprobado,\n  (SELECT id_prestamo FROM nuevo)                                   AS id_prestamo,\n  (SELECT nombre FROM equipo)                                       AS equipo,\n  (SELECT stock_disponible FROM equipo)                             AS stock_restante,\n  EXISTS (SELECT 1 FROM equipos WHERE codigo = $1 AND activo = TRUE) AS equipo_existe,\n  (SELECT stock_disponible FROM equipos WHERE codigo = $1)          AS stock_antes;",
         "options": {
-          "queryReplacement": "={{ $json.datos.codigo_equipo }},{{ $json.datos.cantidad }},{{ $json.datos.carne }},{{ $json.datos.nombre_estudiante }},{{ $json.datos.fecha_devolucion }}"
+          "queryReplacement": "={{ $json.datos.codigo_equipo }},{{ $json.datos.cantidad }},{{ $json.datos.carne }},{{ $json.datos.nombre_estudiante }},{{ $json.datos.fecha_devolucion }},{{ $json.datos.telefono }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -576,
-        -448
+        -624,
+        -464
       ],
       "id": "9eea51a4-4a0a-415c-8ce2-b8c32983009b",
       "name": "Registrar prestamo",
@@ -65,8 +65,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -352,
-        -448
+        -400,
+        -464
       ],
       "id": "e033ff8f-acf9-4fcd-9831-a37c744047aa",
       "name": "¿Prestamo aprobado?"
@@ -159,8 +159,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -128,
-        -544
+        -176,
+        -560
       ],
       "id": "bea1fd56-07bd-4109-93de-423e014f2bef",
       "name": "Auditoria exito",
@@ -218,8 +218,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
       "position": [
-        96,
-        -544
+        48,
+        -560
       ],
       "id": "c9f72d01-7c69-4ef0-8826-830268e512b4",
       "name": "Resultado exito"
@@ -312,8 +312,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -128,
-        -352
+        -176,
+        -368
       ],
       "id": "d233282b-c8c0-421c-aa75-b07f537ce54e",
       "name": "Auditoria sin stock",
@@ -359,8 +359,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
       "position": [
-        96,
-        -352
+        48,
+        -368
       ],
       "id": "b4fcf760-3734-4149-a6a7-4843e3f1bb8e",
       "name": "Resultado rechazo"
@@ -440,7 +440,7 @@
     "errorWorkflow": "ySVq8j0bYes31oa4",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "dcae3033-9566-4b50-89c2-c2d6c71fb7a3",
+  "versionId": "a506dfd9-0e7c-4bd0-9b0d-9ac49fec2c46",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "1a8ee50d659751cad9ab85ce1b7842650fc4b875b3511677dfe586aeb6380720"

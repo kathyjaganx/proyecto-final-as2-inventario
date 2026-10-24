@@ -25,8 +25,8 @@ class GeneradorComprobantePdfTest {
     private final GeneradorComprobantePdf generador = new GeneradorComprobantePdf();
 
     private ComprobantePrestamo comprobante() {
-        return new ComprobantePrestamo(6, "4090-23-5555", "Begoña Pérez Tzul", "ARD-001", "Kit Arduino UNO",
-                1, "2026-10-27", LocalDateTime.of(2026, 10, 22, 15, 30));
+        return new ComprobantePrestamo(6, "4090-23-5555", "Begoña Pérez Tzul", "55551234", "ARD-001",
+                "Kit Arduino UNO", 1, "2026-10-27", LocalDateTime.of(2026, 10, 22, 15, 30));
     }
 
     private String leerTexto(byte[] pdf) throws Exception {
@@ -55,6 +55,8 @@ class GeneradorComprobantePdfTest {
         assertTrue(texto.contains("No. 6"));
         assertTrue(texto.contains("4090-23-5555"));
         assertTrue(texto.contains("Begoña Pérez Tzul"));
+        assertTrue(texto.contains("Teléfono"));
+        assertTrue(texto.contains("5555-1234"));
         assertTrue(texto.contains("ARD-001"));
         assertTrue(texto.contains("Kit Arduino UNO"));
         assertTrue(texto.contains("27/10/2026"));
@@ -66,7 +68,7 @@ class GeneradorComprobantePdfTest {
     @DisplayName("Los datos vacíos se imprimen como '-' sin fallar")
     void datosVacios() throws Exception {
         ComprobantePrestamo incompleto =
-                new ComprobantePrestamo(7, null, " ", "LAP-001", null, null, null, null);
+                new ComprobantePrestamo(7, null, " ", null, "LAP-001", null, null, null, null);
 
         String texto = leerTexto(generador.generar(incompleto));
 
@@ -86,6 +88,14 @@ class GeneradorComprobantePdfTest {
         assertEquals("27/10/2026", GeneradorComprobantePdf.formatearFecha("2026-10-27"));
         assertEquals("pronto", GeneradorComprobantePdf.formatearFecha("pronto"));
         assertNull(GeneradorComprobantePdf.formatearFecha(null));
+    }
+
+    @Test
+    @DisplayName("Formatea el teléfono como 0000-0000, y deja igual lo que no tiene 8 dígitos")
+    void formateaTelefono() {
+        assertEquals("5555-1234", GeneradorComprobantePdf.formatearTelefono("55551234"));
+        assertEquals("1234", GeneradorComprobantePdf.formatearTelefono("1234"));
+        assertNull(GeneradorComprobantePdf.formatearTelefono(null));
     }
 
     @Test

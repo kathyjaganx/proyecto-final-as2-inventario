@@ -1,6 +1,7 @@
 {
   "carne": "12345",
   "nombre_estudiante": "Juan123",
+  "telefono": "123",
   "codigo_equipo": "laptop",
   "cantidad": 0,
   "fecha_devolucion": "2020-01-01"

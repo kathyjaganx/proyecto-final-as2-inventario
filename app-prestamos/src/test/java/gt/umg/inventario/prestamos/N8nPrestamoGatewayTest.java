@@ -2,6 +2,7 @@ package gt.umg.inventario.prestamos;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
@@ -54,7 +55,7 @@ class N8nPrestamoGatewayTest {
     }
 
     private SolicitudPrestamo solicitud() {
-        return new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", "LAP-001", 1, "2026-10-29");
+        return new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", "55551234", "LAP-001", 1, "2026-10-29");
     }
 
     // ---------- La petición que se envía ----------
@@ -68,6 +69,7 @@ class N8nPrestamoGatewayTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.carne").value("4090-23-1234"))
                 .andExpect(jsonPath("$.nombre_estudiante").value("Ana Lucia Pop"))
+                .andExpect(jsonPath("$.telefono").value("55551234"))
                 .andExpect(jsonPath("$.codigo_equipo").value("LAP-001"))
                 .andExpect(jsonPath("$.cantidad").value(1))
                 .andExpect(jsonPath("$.fecha_devolucion").value("2026-10-29"))
@@ -86,6 +88,7 @@ class N8nPrestamoGatewayTest {
         assertTrue(respuesta.mensaje().contains("Número de préstamo: 5"));
         assertTrue(respuesta.mensaje().contains("Laptop Dell Latitude"));
         assertTrue(respuesta.mensaje().contains("2026-10-29"));
+        assertEquals(new DetallePrestamo(5L, "Laptop Dell Latitude", "2026-10-29"), respuesta.detalle());
     }
 
     // ---------- Respuestas de n8n ----------
@@ -98,14 +101,15 @@ class N8nPrestamoGatewayTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .body("""
                               {"estado":"RECHAZADO","mensaje":"La solicitud tiene datos invalidos",
-                               "errores":["Carné inválido","Cantidad inválida"]}
+                               "errores":["Carné inválido","Teléfono inválido. Debe tener 8 dígitos"]}
                               """));
 
         RespuestaPrestamo respuesta = gateway.enviar(solicitud());
 
         assertEquals(400, respuesta.codigoHttp());
         assertEquals(RespuestaPrestamo.RECHAZADO, respuesta.estado());
-        assertEquals("Carné inválido; Cantidad inválida", respuesta.mensaje());
+        assertEquals("Carné inválido; Teléfono inválido. Debe tener 8 dígitos", respuesta.mensaje());
+        assertNull(respuesta.detalle());
     }
 
     @Test
@@ -123,6 +127,7 @@ class N8nPrestamoGatewayTest {
 
         assertEquals(409, respuesta.codigoHttp());
         assertEquals("Stock insuficiente para la cantidad solicitada (disponibles: 3)", respuesta.mensaje());
+        assertNull(respuesta.detalle());
     }
 
     @Test
@@ -169,6 +174,7 @@ class N8nPrestamoGatewayTest {
 
         assertTrue(respuesta.fueAprobado());
         assertTrue(respuesta.mensaje().contains("Número de préstamo: 7"));
+        assertEquals(7L, respuesta.detalle().numeroPrestamo());
     }
 
     @Test

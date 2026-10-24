@@ -11,13 +11,15 @@ public class FormularioPrestamo {
 
     private String carne;
     private String nombreEstudiante;
+    private String telefono;
     private String codigoEquipo;
     private String cantidad;
     private String fechaDevolucion;
 
     /** Convierte el formulario en una solicitud para el ServicioPrestamos. */
     public SolicitudPrestamo aSolicitud() {
-        return new SolicitudPrestamo(carne, nombreEstudiante, codigoEquipo, convertirCantidad(), fechaDevolucion);
+        return new SolicitudPrestamo(carne, nombreEstudiante, telefono, codigoEquipo,
+                convertirCantidad(), fechaDevolucion);
     }
 
     /** Devuelve la cantidad como número, o null si no es un número entero válido. */
@@ -39,6 +41,9 @@ public class FormularioPrestamo {
 
     public String getNombreEstudiante() { return nombreEstudiante; }
     public void setNombreEstudiante(String nombreEstudiante) { this.nombreEstudiante = nombreEstudiante; }
+
+    public String getTelefono() { return telefono; }
+    public void setTelefono(String telefono) { this.telefono = telefono; }
 
     public String getCodigoEquipo() { return codigoEquipo; }
     public void setCodigoEquipo(String codigoEquipo) { this.codigoEquipo = codigoEquipo; }

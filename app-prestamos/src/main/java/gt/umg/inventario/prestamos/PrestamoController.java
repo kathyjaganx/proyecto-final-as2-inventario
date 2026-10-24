@@ -93,6 +93,7 @@ public class PrestamoController {
                 detalle.numeroPrestamo(),
                 solicitud.carne(),
                 solicitud.nombreEstudiante(),
+                solicitud.telefono(),
                 solicitud.codigoEquipo(),
                 detalle.equipo(),
                 solicitud.cantidad(),

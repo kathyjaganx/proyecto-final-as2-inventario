@@ -51,7 +51,7 @@ class ServicioPrestamosTest {
     }
 
     private SolicitudPrestamo solicitudValida() {
-        return new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", "LAP-001", 1, "2026-10-29");
+        return new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", "55551234", "LAP-001", 1, "2026-10-29");
     }
 
     // ---------- Validación antes de contactar a n8n ----------
@@ -59,13 +59,14 @@ class ServicioPrestamosTest {
     @Test
     @DisplayName("Con datos inválidos responde 400 y NUNCA contacta a n8n")
     void datosInvalidosNoLlamanAN8n() {
-        SolicitudPrestamo todoMal = new SolicitudPrestamo("12345", "Juan123", "laptop", 0, "2020-01-01");
+        SolicitudPrestamo todoMal = new SolicitudPrestamo("12345", "Juan123", "123", "laptop", 0, "2020-01-01");
 
         RespuestaPrestamo respuesta = servicio.solicitar(todoMal);
 
         assertEquals(400, respuesta.codigoHttp());
         assertEquals(RespuestaPrestamo.RECHAZADO, respuesta.estado());
         assertTrue(respuesta.mensaje().contains("Carné inválido"));
+        assertTrue(respuesta.mensaje().contains("Teléfono inválido"));
         verifyNoInteractions(gateway);
     }
 
@@ -95,12 +96,12 @@ class ServicioPrestamosTest {
     }
 
     @Test
-    @DisplayName("Envía a n8n los datos ya limpios (sin espacios y código en mayúsculas)")
+    @DisplayName("Envía a n8n los datos ya limpios (sin espacios, código en mayúsculas y teléfono sin guion)")
     void enviaDatosNormalizados() throws Exception {
         when(gateway.enviar(any()))
                 .thenReturn(new RespuestaPrestamo(201, RespuestaPrestamo.APROBADO, "ok"));
-        SolicitudPrestamo conEspacios =
-                new SolicitudPrestamo(" 4090-23-1234 ", " Ana Lucia Pop ", " lap-001 ", 1, "2026-10-29");
+        SolicitudPrestamo conEspacios = new SolicitudPrestamo(
+                " 4090-23-1234 ", " Ana Lucia Pop ", " 5555-1234 ", " lap-001 ", 1, "2026-10-29");
 
         servicio.solicitar(conEspacios);
 
@@ -108,6 +109,7 @@ class ServicioPrestamosTest {
         assertEquals("LAP-001", solicitudEnviada.getValue().codigoEquipo());
         assertEquals("4090-23-1234", solicitudEnviada.getValue().carne());
         assertEquals("Ana Lucia Pop", solicitudEnviada.getValue().nombreEstudiante());
+        assertEquals("55551234", solicitudEnviada.getValue().telefono());
     }
 
     @Test

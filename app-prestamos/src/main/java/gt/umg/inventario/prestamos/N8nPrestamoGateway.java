@@ -41,6 +41,7 @@ public class N8nPrestamoGateway implements PrestamoGateway {
         Map<String, Object> cuerpo = new LinkedHashMap<>();
         cuerpo.put("carne", solicitud.carne());
         cuerpo.put("nombre_estudiante", solicitud.nombreEstudiante());
+        cuerpo.put("telefono", solicitud.telefono());
         cuerpo.put("codigo_equipo", solicitud.codigoEquipo());
         cuerpo.put("cantidad", solicitud.cantidad());
         cuerpo.put("fecha_devolucion", solicitud.fechaDevolucion());

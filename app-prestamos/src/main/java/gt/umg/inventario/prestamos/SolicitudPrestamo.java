@@ -9,19 +9,22 @@ package gt.umg.inventario.prestamos;
 public record SolicitudPrestamo(
         String carne,
         String nombreEstudiante,
+        String telefono,
         String codigoEquipo,
         Integer cantidad,
         String fechaDevolucion
 ) {
 
     /**
-     * Devuelve una copia con los textos limpios: sin espacios sobrantes
-     * y el código de equipo en mayúsculas, igual que el nodo "Validar datos".
+     * Devuelve una copia con los textos limpios, igual que el nodo "Validar datos":
+     * sin espacios sobrantes, el código de equipo en mayúsculas
+     * y el teléfono sin espacios ni guiones (5555-1234 queda como 55551234).
      */
     public SolicitudPrestamo normalizada() {
         return new SolicitudPrestamo(
                 limpiar(carne),
                 limpiar(nombreEstudiante),
+                limpiar(telefono).replaceAll("[\\s-]", ""),
                 limpiar(codigoEquipo).toUpperCase(),
                 cantidad,
                 limpiar(fechaDevolucion)

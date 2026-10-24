@@ -25,6 +25,7 @@ public class ValidadorPrestamo {
 
     private static final Pattern PATRON_CARNE = Pattern.compile("^\\d{4}-\\d{2}-\\d{3,6}$");
     private static final Pattern PATRON_NOMBRE = Pattern.compile("^[A-Za-zÁÉÍÓÚáéíóúÑñÜü ]{3,100}$");
+    private static final Pattern PATRON_TELEFONO = Pattern.compile("^\\d{8}$");
     private static final Pattern PATRON_CODIGO = Pattern.compile("^[A-Z]{3}-\\d{3}$");
     private static final DateTimeFormatter FORMATO_FECHA =
             DateTimeFormatter.ofPattern("uuuu-MM-dd").withResolverStyle(ResolverStyle.STRICT);
@@ -59,18 +60,23 @@ public class ValidadorPrestamo {
             errores.add("Nombre inválido. Solo letras y espacios (3 a 100 caracteres)");
         }
 
-        // 3. Código de equipo: formato AAA-000
+        // 3. Teléfono: 8 dígitos (los espacios y guiones ya se quitaron al normalizar)
+        if (!PATRON_TELEFONO.matcher(datos.telefono()).matches()) {
+            errores.add("Teléfono inválido. Debe tener 8 dígitos");
+        }
+
+        // 4. Código de equipo: formato AAA-000
         if (!PATRON_CODIGO.matcher(datos.codigoEquipo()).matches()) {
             errores.add("Código de equipo inválido. Formato esperado: AAA-000");
         }
 
-        // 4. Cantidad: número entero entre 1 y 10
+        // 5. Cantidad: número entero entre 1 y 10
         Integer cantidad = datos.cantidad();
         if (cantidad == null || cantidad < CANTIDAD_MINIMA || cantidad > CANTIDAD_MAXIMA) {
             errores.add("Cantidad inválida. Debe ser un número entero entre 1 y 10");
         }
 
-        // 5. Fecha de devolución: fecha real, desde hoy hasta 30 días
+        // 6. Fecha de devolución: fecha real, desde hoy hasta 30 días
         validarFecha(datos.fechaDevolucion(), errores);
 
         return new ResultadoValidacion(errores);

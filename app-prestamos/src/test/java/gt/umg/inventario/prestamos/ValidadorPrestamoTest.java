@@ -27,6 +27,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 @DisplayName("ValidadorPrestamo")
 class ValidadorPrestamoTest {
 
+    private static final String TELEFONO = "55551234";
+
     private ValidadorPrestamo validador;
 
     @BeforeEach
@@ -38,7 +40,7 @@ class ValidadorPrestamoTest {
 
     /** Solicitud con todos los datos correctos; cada prueba cambia solo un campo. */
     private SolicitudPrestamo solicitudValida() {
-        return new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", "LAP-001", 1, "2026-10-29");
+        return new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", TELEFONO, "LAP-001", 1, "2026-10-29");
     }
 
     // ---------- Casos generales ----------
@@ -64,21 +66,21 @@ class ValidadorPrestamoTest {
     @Test
     @DisplayName("Limpia espacios y convierte el código a mayúsculas antes de validar")
     void normalizaDatosAntesDeValidar() {
-        SolicitudPrestamo conEspacios =
-                new SolicitudPrestamo("  4090-23-1234 ", " Ana Lucia Pop ", " lap-001 ", 1, " 2026-10-29 ");
+        SolicitudPrestamo conEspacios = new SolicitudPrestamo(
+                "  4090-23-1234 ", " Ana Lucia Pop ", " 5555-1234 ", " lap-001 ", 1, " 2026-10-29 ");
 
         assertTrue(validador.validar(conEspacios).esValido());
     }
 
     @Test
-    @DisplayName("Detecta los 5 errores a la vez (mismo caso que prestamo_invalido.json)")
+    @DisplayName("Detecta los 6 errores a la vez")
     void detectaTodosLosErrores() {
-        SolicitudPrestamo todoMal = new SolicitudPrestamo("12345", "Juan123", "laptop", 0, "2020-01-01");
+        SolicitudPrestamo todoMal = new SolicitudPrestamo("12345", "Juan123", "123", "laptop", 0, "2020-01-01");
 
         ResultadoValidacion resultado = validador.validar(todoMal);
 
         assertFalse(resultado.esValido());
-        assertEquals(5, resultado.errores().size());
+        assertEquals(6, resultado.errores().size());
     }
 
     @Test
@@ -104,7 +106,7 @@ class ValidadorPrestamoTest {
     @NullAndEmptySource
     @ValueSource(strings = {"12345", "4090-23-12", "abcd-23-1234", "4090/23/1234", "4090-2-12345"})
     void rechazaCarneInvalido(String carne) {
-        SolicitudPrestamo s = new SolicitudPrestamo(carne, "Ana Lucia Pop", "LAP-001", 1, "2026-10-29");
+        SolicitudPrestamo s = new SolicitudPrestamo(carne, "Ana Lucia Pop", TELEFONO, "LAP-001", 1, "2026-10-29");
 
         assertEquals(List.of("Carné inválido. Formato esperado: 0000-00-0000"), validador.validar(s).errores());
     }
@@ -115,7 +117,7 @@ class ValidadorPrestamoTest {
     @NullAndEmptySource
     @ValueSource(strings = {"Juan123", "Al", "Ana@Pop", "Ana_Pop"})
     void rechazaNombreInvalido(String nombre) {
-        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", nombre, "LAP-001", 1, "2026-10-29");
+        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", nombre, TELEFONO, "LAP-001", 1, "2026-10-29");
 
         assertEquals(List.of("Nombre inválido. Solo letras y espacios (3 a 100 caracteres)"),
                 validador.validar(s).errores());
@@ -125,7 +127,7 @@ class ValidadorPrestamoTest {
     @DisplayName("Rechaza un nombre de más de 100 caracteres")
     void rechazaNombreDemasiadoLargo() {
         String nombreLargo = "A".repeat(101);
-        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", nombreLargo, "LAP-001", 1, "2026-10-29");
+        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", nombreLargo, TELEFONO, "LAP-001", 1, "2026-10-29");
 
         assertFalse(validador.validar(s).esValido());
     }
@@ -133,28 +135,49 @@ class ValidadorPrestamoTest {
     @Test
     @DisplayName("Acepta nombres con tildes y ñ")
     void aceptaNombreConTildesYEnie() {
-        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Begoña Pérez Güiza", "LAP-001", 1, "2026-10-29");
+        SolicitudPrestamo s =
+                new SolicitudPrestamo("4090-23-1234", "Begoña Pérez Güiza", TELEFONO, "LAP-001", 1, "2026-10-29");
 
         assertTrue(validador.validar(s).esValido());
     }
 
-    // ---------- Regla 3: código de equipo ----------
+    // ---------- Regla 3: teléfono ----------
+
+    @ParameterizedTest(name = "teléfono válido: \"{0}\"")
+    @ValueSource(strings = {"55551234", "5555-1234", "5555 1234", " 55551234 "})
+    void aceptaTelefonoConEspaciosOGuiones(String telefono) {
+        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", telefono, "LAP-001", 1, "2026-10-29");
+
+        assertTrue(validador.validar(s).esValido());
+    }
+
+    @ParameterizedTest(name = "teléfono inválido: \"{0}\"")
+    @NullAndEmptySource
+    @ValueSource(strings = {"1234567", "123456789", "5555-12a4", "abcdefgh", "+50255551234"})
+    void rechazaTelefonoInvalido(String telefono) {
+        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", telefono, "LAP-001", 1, "2026-10-29");
+
+        assertEquals(List.of("Teléfono inválido. Debe tener 8 dígitos"), validador.validar(s).errores());
+    }
+
+    // ---------- Regla 4: código de equipo ----------
 
     @ParameterizedTest(name = "código inválido: \"{0}\"")
     @NullAndEmptySource
     @ValueSource(strings = {"laptop", "LA-001", "LAP001", "LAP-01", "1AP-001"})
     void rechazaCodigoInvalido(String codigo) {
-        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", codigo, 1, "2026-10-29");
+        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", TELEFONO, codigo, 1, "2026-10-29");
 
         assertEquals(List.of("Código de equipo inválido. Formato esperado: AAA-000"), validador.validar(s).errores());
     }
 
-    // ---------- Regla 4: cantidad ----------
+    // ---------- Regla 5: cantidad ----------
 
     @ParameterizedTest(name = "cantidad válida (límite): {0}")
     @ValueSource(ints = {1, 5, 10})
     void aceptaCantidadEnRango(int cantidad) {
-        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", "LAP-001", cantidad, "2026-10-29");
+        SolicitudPrestamo s =
+                new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", TELEFONO, "LAP-001", cantidad, "2026-10-29");
 
         assertTrue(validador.validar(s).esValido());
     }
@@ -163,18 +186,19 @@ class ValidadorPrestamoTest {
     @NullSource
     @ValueSource(ints = {0, -1, 11, 100})
     void rechazaCantidadFueraDeRango(Integer cantidad) {
-        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", "LAP-001", cantidad, "2026-10-29");
+        SolicitudPrestamo s =
+                new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", TELEFONO, "LAP-001", cantidad, "2026-10-29");
 
         assertEquals(List.of("Cantidad inválida. Debe ser un número entero entre 1 y 10"),
                 validador.validar(s).errores());
     }
 
-    // ---------- Regla 5: fecha de devolución ----------
+    // ---------- Regla 6: fecha de devolución ----------
 
     @ParameterizedTest(name = "fecha válida (límite): {0}")
     @ValueSource(strings = {"2026-10-22", "2026-11-21"})
     void aceptaFechaEnLosLimites(String fecha) {
-        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", "LAP-001", 1, fecha);
+        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", TELEFONO, "LAP-001", 1, fecha);
 
         assertTrue(validador.validar(s).esValido());
     }
@@ -183,7 +207,7 @@ class ValidadorPrestamoTest {
     @NullAndEmptySource
     @ValueSource(strings = {"22/10/2026", "2026-02-30", "2026-13-01", "mañana"})
     void rechazaFechaConFormatoInvalido(String fecha) {
-        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", "LAP-001", 1, fecha);
+        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", TELEFONO, "LAP-001", 1, fecha);
 
         assertEquals(List.of("Fecha de devolución inválida. Formato esperado: AAAA-MM-DD"),
                 validador.validar(s).errores());
@@ -192,7 +216,7 @@ class ValidadorPrestamoTest {
     @ParameterizedTest(name = "fecha fuera de rango: {0}")
     @ValueSource(strings = {"2026-10-21", "2026-11-22", "2020-01-01"})
     void rechazaFechaFueraDeRango(String fecha) {
-        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", "LAP-001", 1, fecha);
+        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", TELEFONO, "LAP-001", 1, fecha);
 
         assertEquals(List.of("La fecha de devolución debe estar entre 2026-10-22 y 2026-11-21"),
                 validador.validar(s).errores());
@@ -203,7 +227,7 @@ class ValidadorPrestamoTest {
     void constructorPorDefecto() {
         ValidadorPrestamo validadorReal = new ValidadorPrestamo();
         String manana = java.time.LocalDate.now(ValidadorPrestamo.ZONA_GUATEMALA).plusDays(1).toString();
-        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", "LAP-001", 1, manana);
+        SolicitudPrestamo s = new SolicitudPrestamo("4090-23-1234", "Ana Lucia Pop", TELEFONO, "LAP-001", 1, manana);
 
         assertTrue(validadorReal.validar(s).esValido());
     }

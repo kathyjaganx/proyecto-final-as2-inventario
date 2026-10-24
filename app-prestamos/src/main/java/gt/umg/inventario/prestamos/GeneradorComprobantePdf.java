@@ -66,6 +66,7 @@ public class GeneradorComprobantePdf {
                 y = fila(hoja, y, "Fecha de registro", c.fechaRegistro() == null ? null : c.fechaRegistro().format(FECHA_HORA));
                 y = fila(hoja, y, "Carné", c.carne());
                 y = fila(hoja, y, "Estudiante", c.nombreEstudiante());
+                y = fila(hoja, y, "Teléfono", formatearTelefono(c.telefono()));
                 y = fila(hoja, y, "Código de equipo", c.codigoEquipo());
                 y = fila(hoja, y, "Equipo", c.equipo());
                 y = fila(hoja, y, "Cantidad", c.cantidad() == null ? null : String.valueOf(c.cantidad()));
@@ -144,5 +145,13 @@ public class GeneradorComprobantePdf {
         } catch (DateTimeParseException e) {
             return fecha;
         }
+    }
+
+    /** Muestra 55551234 como 5555-1234, que es más fácil de leer; si no tiene 8 dígitos, lo deja igual. */
+    static String formatearTelefono(String telefono) {
+        if (telefono == null || !telefono.matches("\\d{8}")) {
+            return telefono;
+        }
+        return telefono.substring(0, 4) + "-" + telefono.substring(4);
     }
 }

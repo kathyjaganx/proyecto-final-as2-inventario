@@ -60,6 +60,7 @@ class PrestamoControllerTest {
         return post("/prestamos")
                 .param("carne", "4090-23-5555")
                 .param("nombreEstudiante", "Pedro Tzul")
+                .param("telefono", "5555-1234")
                 .param("codigoEquipo", codigoEquipo)
                 .param("cantidad", cantidad)
                 .param("fechaDevolucion", "2026-10-27");
@@ -91,6 +92,7 @@ class PrestamoControllerTest {
                 .andExpect(model().attribute("formulario", hasProperty("carne", nullValue())))
                 .andExpect(model().attributeDoesNotExist("respuesta"))
                 .andExpect(content().string(containsString("Préstamo de equipo de laboratorio")))
+                .andExpect(content().string(containsString("Número de celular")))
                 .andExpect(content().string(not(containsString("Préstamo aprobado"))));
 
         verifyNoInteractions(servicio);
@@ -126,6 +128,7 @@ class PrestamoControllerTest {
         SolicitudPrestamo enviada = captor.getValue();
         assertEquals("4090-23-5555", enviada.carne());
         assertEquals("Pedro Tzul", enviada.nombreEstudiante());
+        assertEquals("5555-1234", enviada.telefono());
         assertEquals("ARD-001", enviada.codigoEquipo());
         assertEquals(2, enviada.cantidad());
         assertEquals("2026-10-27", enviada.fechaDevolucion());
@@ -140,6 +143,7 @@ class PrestamoControllerTest {
         navegador.perform(enviarFormulario("PRO-001", "1"))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("formulario", hasProperty("carne", is("4090-23-5555"))))
+                .andExpect(model().attribute("formulario", hasProperty("telefono", is("5555-1234"))))
                 .andExpect(model().attribute("formulario", hasProperty("codigoEquipo", is("PRO-001"))))
                 .andExpect(model().attributeDoesNotExist("comprobanteDisponible"))
                 .andExpect(request().sessionAttribute(PrestamoController.SESION_COMPROBANTE, nullValue()))
@@ -152,11 +156,11 @@ class PrestamoControllerTest {
     @DisplayName("Varios errores separados por ';' se muestran cada uno en su línea")
     void variosErroresEnLista() throws Exception {
         when(servicio.solicitar(any())).thenReturn(
-                RespuestaPrestamo.rechazada(400, "Carné inválido; Nombre inválido"));
+                RespuestaPrestamo.rechazada(400, "Carné inválido; Teléfono inválido. Debe tener 8 dígitos"));
 
         navegador.perform(enviarFormulario("ARD-001", "1"))
                 .andExpect(content().string(containsString("<li>Carné inválido</li>")))
-                .andExpect(content().string(containsString("<li>Nombre inválido</li>")));
+                .andExpect(content().string(containsString("<li>Teléfono inválido. Debe tener 8 dígitos</li>")));
     }
 
     @Test
@@ -216,6 +220,7 @@ class PrestamoControllerTest {
         assertEquals(6L, guardado.numeroPrestamo());
         assertEquals("ARD-001", guardado.codigoEquipo());
         assertEquals("Pedro Tzul", guardado.nombreEstudiante());
+        assertEquals("55551234", guardado.telefono());
         assertEquals("Kit Arduino UNO", guardado.equipo());
         assertEquals("2026-10-27", guardado.fechaDevolucion());
     }

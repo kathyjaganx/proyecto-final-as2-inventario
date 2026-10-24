@@ -12,6 +12,7 @@ public record ComprobantePrestamo(
         long numeroPrestamo,
         String carne,
         String nombreEstudiante,
+        String telefono,
         String codigoEquipo,
         String equipo,
         Integer cantidad,

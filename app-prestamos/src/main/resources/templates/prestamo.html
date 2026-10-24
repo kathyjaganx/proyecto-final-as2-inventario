@@ -96,6 +96,10 @@
         <label for="nombreEstudiante">Nombre del estudiante</label>
         <input id="nombreEstudiante" type="text" th:field="*{nombreEstudiante}" placeholder="Ana Lucía Pop" required>
 
+        <label for="telefono">Número de celular <span class="ayuda">(8 dígitos)</span></label>
+        <input id="telefono" type="tel" th:field="*{telefono}" inputmode="numeric"
+               placeholder="5555-1234" maxlength="9" required>
+
         <div class="fila">
             <div>
                 <label for="codigoEquipo">Código de equipo</label>

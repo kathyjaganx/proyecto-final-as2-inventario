@@ -18,10 +18,12 @@ CREATE TABLE equipos (
 );
 
 -- Préstamos registrados
+-- El teléfono no es único: un mismo estudiante puede tener varios préstamos
 CREATE TABLE prestamos (
     id_prestamo               SERIAL PRIMARY KEY,
     carne                     VARCHAR(15)  NOT NULL,
     nombre_estudiante         VARCHAR(100) NOT NULL,
+    telefono                  VARCHAR(8) CHECK (telefono ~ '^[0-9]{8}$'),
     id_equipo                 INT NOT NULL REFERENCES equipos(id_equipo),
     cantidad                  INT NOT NULL CHECK (cantidad > 0),
     fecha_prestamo            DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -57,6 +59,7 @@ CREATE TABLE errores (
 -- Índices para las consultas más frecuentes
 CREATE INDEX idx_prestamos_estado ON prestamos(estado);
 CREATE INDEX idx_prestamos_vencimiento ON prestamos(fecha_devolucion_esperada);
+CREATE INDEX idx_prestamos_telefono ON prestamos(telefono);
 
 -- Datos iniciales de prueba
 INSERT INTO equipos (codigo, nombre, categoria, stock_total, stock_disponible) VALUES
