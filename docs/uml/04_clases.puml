@@ -19,18 +19,24 @@ package "gt.umg.inventario.prestamos" {
     + validadorPrestamo() : ValidadorPrestamo
     + prestamoGateway(url : String, apiKey : String, timeout : long) : PrestamoGateway
     + servicioPrestamos(validador, gateway) : ServicioPrestamos
+    + generadorComprobantePdf() : GeneradorComprobantePdf
   }
 
   class PrestamoController <<Controller>> {
+    ~ {static} SESION_COMPROBANTE : String = "comprobantePrestamo"
     - servicio : ServicioPrestamos
+    - generadorPdf : GeneradorComprobantePdf
     + inicio() : String
     + mostrarFormulario(modelo : Model) : String
-    + solicitarPrestamo(formulario : FormularioPrestamo, modelo : Model) : String
+    + solicitarPrestamo(formulario : FormularioPrestamo, modelo : Model, sesion : HttpSession) : String
+    + descargarComprobante(sesion : HttpSession) : ResponseEntity<byte[]>
+    - {static} crearComprobante(solicitud : SolicitudPrestamo, detalle : DetallePrestamo) : ComprobantePrestamo
   }
 
   class FormularioPrestamo {
     - carne : String
     - nombreEstudiante : String
+    - telefono : String
     - codigoEquipo : String
     - cantidad : String
     - fechaDevolucion : String
@@ -48,6 +54,7 @@ package "gt.umg.inventario.prestamos" {
     + {static} ZONA_GUATEMALA : ZoneId
     + {static} CANTIDAD_MAXIMA : int = 10
     + {static} DIAS_MAXIMOS_PRESTAMO : int = 30
+    - {static} PATRON_TELEFONO : Pattern = "^\\d{8}$"
     - reloj : Clock
     + validar(solicitud : SolicitudPrestamo) : ResultadoValidacion
     - validarFecha(texto : String, errores : List<String>) : void
@@ -63,7 +70,7 @@ package "gt.umg.inventario.prestamos" {
     - url : String
     - apiKey : String
     + enviar(solicitud : SolicitudPrestamo) : RespuestaPrestamo
-    - convertir(codigo : int, datos : RespuestaN8n) : RespuestaPrestamo
+    - {static} convertir(codigo : int, datos : RespuestaN8n) : RespuestaPrestamo
   }
 
   class RespuestaN8n <<record>> {
@@ -76,9 +83,20 @@ package "gt.umg.inventario.prestamos" {
     stockDisponible : Integer
   }
 
+  class GeneradorComprobantePdf {
+    - normal : PDType1Font
+    - negrita : PDType1Font
+    + generar(comprobante : ComprobantePrestamo) : byte[]
+    - fila(hoja, y : float, etiqueta : String, valor : String) : float
+    - texto(hoja, fuente, tamano : float, color, x : float, y : float, contenido : String) : void
+    ~ {static} formatearFecha(fecha : String) : String
+    ~ {static} formatearTelefono(telefono : String) : String
+  }
+
   class SolicitudPrestamo <<record>> {
     carne : String
     nombreEstudiante : String
+    telefono : String
     codigoEquipo : String
     cantidad : Integer
     fechaDevolucion : String
@@ -94,9 +112,29 @@ package "gt.umg.inventario.prestamos" {
     codigoHttp : int
     estado : String
     mensaje : String
+    detalle : DetallePrestamo
     + fueAprobado() : boolean
     + {static} rechazada(codigo : int, mensaje : String) : RespuestaPrestamo
     + {static} error(mensaje : String) : RespuestaPrestamo
+  }
+
+  class DetallePrestamo <<record>> {
+    numeroPrestamo : Long
+    equipo : String
+    fechaDevolucion : String
+  }
+
+  class ComprobantePrestamo <<record>> {
+    numeroPrestamo : long
+    carne : String
+    nombreEstudiante : String
+    telefono : String
+    codigoEquipo : String
+    equipo : String
+    cantidad : Integer
+    fechaDevolucion : String
+    fechaRegistro : LocalDateTime
+    + nombreArchivo() : String
   }
 
   class PrestamoGatewayException {
@@ -111,19 +149,25 @@ PrestamoGatewayException --|> Exception
 
 ' --- Asociaciones (una clase guarda a otra como atributo) ---
 PrestamoController --> "1" ServicioPrestamos
+PrestamoController --> "1" GeneradorComprobantePdf
 ServicioPrestamos --> "1" ValidadorPrestamo
 ServicioPrestamos --> "1" PrestamoGateway
+RespuestaPrestamo --> "0..1" DetallePrestamo
 
 ' --- Clase anidada ---
 N8nPrestamoGateway +-- RespuestaN8n
 
 ' --- Dependencias (una clase usa o crea a otra) ---
 PrestamoController ..> FormularioPrestamo : recibe
+PrestamoController ..> ComprobantePrestamo : crea y guarda\nen la sesión
 FormularioPrestamo ..> SolicitudPrestamo : crea
 ValidadorPrestamo ..> ResultadoValidacion : crea
 ServicioPrestamos ..> RespuestaPrestamo : devuelve
+N8nPrestamoGateway ..> DetallePrestamo : crea
+GeneradorComprobantePdf ..> ComprobantePrestamo : dibuja en PDF
 PrestamoGateway ..> PrestamoGatewayException : lanza
 ConfiguracionPrestamos ..> ServicioPrestamos : crea
 ConfiguracionPrestamos ..> N8nPrestamoGateway : crea
 ConfiguracionPrestamos ..> ValidadorPrestamo : crea
+ConfiguracionPrestamos ..> GeneradorComprobantePdf : crea
 @enduml

@@ -5,24 +5,26 @@ skinparam NodeBackgroundColor #EEF3FA
 skinparam NodeBorderColor #1F3864
 skinparam ComponentBackgroundColor #FFFFFF
 skinparam ComponentBorderColor #1F3864
+skinparam ArtifactBackgroundColor #FFFFFF
+skinparam ArtifactBorderColor #1F3864
 skinparam DatabaseBackgroundColor #FFFFFF
 skinparam ArrowColor #1F3864
-title Diagrama de despliegue\nEntorno local del sistema de préstamos
+title Diagrama de despliegue\nEntorno local del sistema de préstamos (3 contenedores Docker)
 
 actor "Encargado del\nlaboratorio" as U
 
 node "Computadora local (Windows 11)" as PC {
 
   node "Navegador web" as NAV
-
-  node "Máquina virtual de Java (JVM)" as JVM {
-    artifact "app-prestamos-0.2.0.jar\nSpring Boot + Tomcat\npuerto 8080" as APP
-  }
-
-  file ".env\n(credenciales)" as ENV
+  folder "Descargas/\ncomprobante_prestamo_N.pdf" as DESC
+  file ".env\n(credenciales y clave X-API-Key)" as ENV
   folder "Carpeta reportes/" as REP
 
-  node "Docker Desktop" as DOCKER {
+  node "Docker Desktop (red interna de Docker)" as DOCKER {
+
+    node "Contenedor inventario_app\nimagen app-prestamos:0.2.0 · puerto 8080\nJava 21 · usuario appuser" as APPC {
+      artifact "app.jar\nSpring Boot + Thymeleaf\n+ Apache PDFBox" as APP
+    }
 
     node "Contenedor inventario_n8n\nimagen n8nio/n8n · puerto 5678" as N8N {
       component "WF1 - Ingesta" as WF1
@@ -41,18 +43,20 @@ node "Computadora local (Windows 11)" as PC {
 }
 
 U --> NAV : usa
-NAV --> APP : HTTP :8080
-APP --> WF1 : HTTP POST :5678\ncabecera X-API-Key
+NAV <--> APP : HTTP :8080\n(formulario y comprobante PDF)
+NAV --> DESC : guarda
+APP --> WF1 : HTTP POST http://n8n:5678\ncabecera X-API-Key
 WF1 --> WF2 : sub-workflow
-N8N --> DB : TCP :5432\nred interna de Docker
+N8N --> DB : TCP :5432
 WF3 --> REP : escribe CSV\n(montado en /reportes)
 N8N --> V1 : workflows y\ncredenciales cifradas
 PGC --> V2 : datos persistentes
-ENV ..> N8N : variables de entorno
-ENV ..> PGC : variables de entorno
+ENV ..> APPC : N8N_API_KEY
+ENV ..> N8N : N8N_ENCRYPTION_KEY
+ENV ..> PGC : usuario y contraseña
 
-note right of APP
-  La clave se lee de la
-  variable de entorno N8N_API_KEY
-end note
+legend bottom
+  Los tres contenedores tienen restart: unless-stopped: arrancan solos cada vez que se inicia Docker Desktop.
+  Dentro de Docker se comunican por nombre de servicio (n8n, postgres), no por localhost.
+endlegend
 @enduml

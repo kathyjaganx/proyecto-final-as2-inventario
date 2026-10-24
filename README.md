@@ -13,7 +13,7 @@ Docente: Ing. Edgar Raúl Molina Rey
 
 Sistema que automatiza, en un entorno 100 % local, el control de préstamos de equipo de un laboratorio. Usa **n8n** para los workflows, **PostgreSQL** para la persistencia, **Docker** para el despliegue y una **aplicación web en Spring Boot** como interfaz para los usuarios.
 
-El sistema recibe solicitudes de préstamo, valida los datos, verifica el stock disponible, registra el préstamo, descuenta el inventario, entrega un **comprobante en PDF** de cada préstamo aprobado y genera un reporte diario de préstamos vencidos. Todas las operaciones quedan registradas en una bitácora de auditoría, y los errores se capturan en una tabla aparte.
+El sistema recibe solicitudes de préstamo, valida los datos (incluido el número de celular del estudiante), verifica el stock disponible, registra el préstamo, descuenta el inventario, entrega un **comprobante en PDF** de cada préstamo aprobado y genera un reporte diario de préstamos vencidos. Todas las operaciones quedan registradas en una bitácora de auditoría, y los errores se capturan en una tabla aparte.
 
 ## Arquitectura
 
@@ -35,8 +35,8 @@ Dentro de Docker, los contenedores se comunican por **nombre de servicio**: la a
 
 | Workflow | Tipo | Función |
 |---|---|---|
-| **WF1 – Ingesta de préstamos** | Ingesta | Webhook protegido que recibe y valida la solicitud. Rechaza datos inválidos (400) o llama al WF2. |
-| **WF2 – Procesamiento de préstamos** | Procesamiento | Verifica stock, registra el préstamo y descuenta el inventario en una sola operación atómica. Responde 201 (aprobado) o 409 (sin stock). |
+| **WF1 – Ingesta de préstamos** | Ingesta | Webhook protegido que recibe y valida la solicitud (6 reglas). Rechaza datos inválidos (400) o llama al WF2. |
+| **WF2 – Procesamiento de préstamos** | Procesamiento | Verifica stock, registra el préstamo con el teléfono del estudiante y descuenta el inventario en una sola operación atómica. Responde 201 (aprobado) o 409 (sin stock). |
 | **WF3 – Salida de reportes** | Salida | Todos los días a las 7:00 a. m. marca los préstamos vencidos y genera un reporte en la auditoría y en un archivo CSV. |
 | **WF4 – Manejo de errores** | Errores | Error Trigger conectado a WF1, WF2 y WF3. Registra cada fallo en la tabla `errores`. |
 
@@ -45,9 +45,11 @@ Dentro de Docker, los contenedores se comunican por **nombre de servicio**: la a
 | Tabla | Contenido |
 |---|---|
 | `equipos` | Inventario del laboratorio (stock total y disponible) |
-| `prestamos` | Préstamos registrados y su estado (ACTIVO, DEVUELTO, VENCIDO) |
+| `prestamos` | Préstamos registrados, con el teléfono del estudiante y su estado (ACTIVO, DEVUELTO, VENCIDO) |
 | `auditoria` | Bitácora de todas las operaciones y su resultado |
 | `errores` | Fallos capturados por el WF4 |
+
+El teléfono **no es único**: un mismo estudiante puede tener varios préstamos con el mismo número. La columna tiene un índice para consultar rápidamente todos los préstamos de un número.
 
 ### Equipos registrados
 
@@ -60,6 +62,19 @@ Dentro de Docker, los contenedores se comunican por **nombre de servicio**: la a
 | `HDM-001` | Cable HDMI 3m | 15 |
 
 Cualquier otro código, aunque tenga el formato correcto, se rechaza con 409.
+
+### Reglas de validación
+
+Las aplican **tanto la aplicación web como el WF1**, con los mismos mensajes:
+
+| Dato | Regla |
+|---|---|
+| Carné | Formato `0000-00-0000` |
+| Nombre | Solo letras y espacios, de 3 a 100 caracteres |
+| Teléfono | 8 dígitos. Se aceptan espacios o guiones (`5555-1234`), que se eliminan antes de guardar |
+| Código de equipo | Formato `AAA-000` |
+| Cantidad | Número entero de 1 a 10 |
+| Fecha de devolución | Fecha real, entre hoy y 30 días después |
 
 ## Diagramas
 
@@ -163,9 +178,9 @@ Para editar un diagrama UML, abrir su archivo `.puml`, pegar el contenido en [pl
 
 ## Aplicación web
 
-Abrir **http://localhost:8080**. Muestra un formulario de préstamo y el resultado: **verde** (aprobado), **naranja** (rechazado) o **rojo** (error de comunicación).
+Abrir **http://localhost:8080**. Muestra un formulario de préstamo con el carné, el nombre, el **número de celular**, el equipo, la cantidad y la fecha de devolución, y el resultado: **verde** (aprobado), **naranja** (rechazado) o **rojo** (error de comunicación).
 
-Cuando el préstamo se aprueba, aparece el botón **Descargar comprobante (PDF)**. El comprobante incluye el número de préstamo, el estudiante, el equipo, la cantidad, la fecha de devolución y líneas para las firmas del encargado y del estudiante. Por seguridad, solo se puede descargar el comprobante del préstamo recién aprobado en esa misma sesión del navegador.
+Cuando el préstamo se aprueba, aparece el botón **Descargar comprobante (PDF)**. El comprobante incluye el número de préstamo, el estudiante, su teléfono, el equipo, la cantidad, la fecha de devolución y líneas para las firmas del encargado y del estudiante. Por seguridad, solo se puede descargar el comprobante del préstamo recién aprobado en esa misma sesión del navegador.
 
 ### Componentes
 
@@ -173,7 +188,7 @@ Cuando el préstamo se aprueba, aparece el botón **Descargar comprobante (PDF)*
 |---|---|
 | `PrestamoController` | Atiende el formulario en `/prestamos` y la descarga en `/prestamos/comprobante` |
 | `ServicioPrestamos` | Valida la solicitud y solo si es válida la envía a n8n |
-| `ValidadorPrestamo` | Las mismas 5 reglas de validación del WF1 |
+| `ValidadorPrestamo` | Las mismas 6 reglas de validación del WF1 |
 | `N8nPrestamoGateway` | Cliente HTTP que llama al webhook con la cabecera `X-API-Key` |
 | `GeneradorComprobantePdf` | Dibuja el comprobante en PDF con Apache PDFBox |
 | `ConfiguracionPrestamos` | Conecta las piezas (inyección de dependencias) |
@@ -220,6 +235,7 @@ Formato de la solicitud:
 {
   "carne": "4090-23-1234",
   "nombre_estudiante": "Ana Lucia Pop",
+  "telefono": "5555-1234",
   "codigo_equipo": "PRO-001",
   "cantidad": 1,
   "fecha_devolucion": "2026-10-28"
@@ -241,8 +257,8 @@ Respuestas posibles:
 
 | Caso | Archivo | Resultado esperado |
 |---|---|---|
-| Datos inválidos | `pruebas/prestamo_invalido.json` | 400 con la lista de 5 errores |
-| Préstamo válido | `pruebas/prestamo_valido.json` o `prestamo_valido_laptop.json` | 201 con el número de préstamo |
+| Datos inválidos | `pruebas/prestamo_invalido.json` | 400 con la lista de 6 errores |
+| Préstamo válido | `pruebas/prestamo_valido.json` o `prestamo_valido_laptop.json` | 201 con el número de préstamo; el teléfono se guarda sin guion |
 | Sin stock | Repetir el préstamo válido hasta agotar el stock | 409 con el stock disponible |
 | Acceso sin clave | Enviar sin la cabecera `X-API-Key` | 403 |
 | Préstamo vencido | `pruebas/crear_vencido.sql` y ejecutar el WF3 | El préstamo pasa a VENCIDO y se genera el CSV |
@@ -267,22 +283,22 @@ mvn clean verify
 
 | Clase de prueba | Pruebas | Herramientas | Qué verifica |
 |---|---|---|---|
-| `ValidadorPrestamoTest` | 48 | JUnit (parametrizadas) | Las 5 reglas, con valores válidos, inválidos y límite |
+| `ValidadorPrestamoTest` | 59 | JUnit (parametrizadas) | Las 6 reglas, con valores válidos, inválidos y límite |
 | `ServicioPrestamosTest` | 10 | JUnit + Mockito | Que los datos inválidos nunca lleguen a n8n y el manejo de fallos |
 | `N8nPrestamoGatewayTest` | 14 | MockRestServiceServer | La petición HTTP exacta y la interpretación de cada respuesta de n8n |
 | `PrestamoControllerTest` | 13 | MockMvc + @MockitoBean | Navegación, formulario, colores del resultado, sesión y descarga del comprobante |
-| `GeneradorComprobantePdfTest` | 6 | JUnit + PDFBox | Que el PDF sea válido y contenga todos los datos, con tildes y ñ |
+| `GeneradorComprobantePdfTest` | 7 | JUnit + PDFBox | Que el PDF sea válido y contenga todos los datos, con tildes y ñ |
 | `AppPrestamosApplicationTest` | 1 | @SpringBootTest | Que la aplicación completa arranca y conecta sus piezas |
-| **Total** | **92** | | |
+| **Total** | **104** | | |
 
 **Cobertura (JaCoCo):**
 
 | Métrica | Resultado |
 |---|---|
-| Instrucciones | 1 255 de 1 267 (99 %) |
-| Ramas | 77 de 78 (98 %) |
-| Líneas | 250 de 254 |
-| Métodos | 60 de 61 |
+| Instrucciones | 1 323 de 1 335 (99 %) |
+| Ramas | 83 de 84 (98 %) |
+| Líneas | 263 de 267 |
+| Métodos | 63 de 64 |
 | Clases | 15 de 15 |
 
 Para ver el reporte de cobertura:
@@ -295,7 +311,7 @@ start target\site\jacoco\index.html
 
 - **Credenciales en variables de entorno:** ninguna contraseña ni clave está escrita en el código. Todas viven en `.env`, que está excluido del repositorio con `.gitignore`.
 - **Control de acceso:** el webhook exige la cabecera `X-API-Key` (Header Auth).
-- **Validación de entradas en dos capas:** la aplicación web y el WF1 aplican las mismas reglas. Los datos inválidos se rechazan antes de llegar a la base de datos.
+- **Validación de entradas en dos capas:** la aplicación web y el WF1 aplican las mismas reglas. Los datos inválidos se rechazan antes de llegar a la base de datos, que además verifica el formato del teléfono con una restricción `CHECK`.
 - **Protección contra inyección SQL:** todas las consultas con datos del usuario usan parámetros o el modo Insert de n8n.
 - **Consistencia de datos:** restricciones `CHECK` en la base de datos y operación atómica para registrar el préstamo y descontar el stock.
 - **Comprobantes no falsificables:** los datos del comprobante se guardan en la sesión del servidor a partir de lo que confirmó n8n; el navegador nunca los envía.
@@ -335,3 +351,4 @@ start target\site\jacoco\index.html
 | Reconstruir la aplicación tras un cambio | `docker compose up -d --build app` |
 | Reiniciar la base desde cero (borra datos) | `docker compose down -v` y luego `docker compose up -d` |
 | Ejecutar pruebas y cobertura | `cd app-prestamos` y `mvn clean verify` |
+| Ver los préstamos de un número | `docker exec -it inventario_db psql -U USUARIO -d inventario_lab -c "SELECT * FROM prestamos WHERE telefono = '55551234';"` |
