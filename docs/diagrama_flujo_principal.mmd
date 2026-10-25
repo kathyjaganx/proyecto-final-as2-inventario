@@ -2,7 +2,7 @@
 flowchart TD
     A(["Solicitud POST /webhook/prestamos"]) --> B{"¿Clave X-API-Key<br/>válida?"}
     B -- No --> B1["Responder 403<br/>Acceso denegado"]
-    B -- Sí --> C["Validar datos<br/>carné · nombre · código · cantidad · fecha"]
+    B -- Sí --> C["Validar datos<br/>carné · nombre · teléfono · código · cantidad · fecha"]
     C --> D{"¿Datos válidos?"}
     D -- No --> E["Registrar en auditoria<br/>RECHAZADO"]
     E --> F["Responder 400<br/>lista de errores"]
@@ -26,10 +26,11 @@ flowchart TD
         K
         M
     end
- 
+
     subgraph WF2["WF2 — Procesamiento"]
         G
         H
         I
         J
         L
+    end

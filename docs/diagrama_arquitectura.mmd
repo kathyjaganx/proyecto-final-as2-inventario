@@ -1,8 +1,11 @@
+%%{init: {'theme': 'default'}}%%
 flowchart LR
-    CLI["Cliente<br/>POST /webhook/prestamos<br/>Header X-API-Key"]
+    USR["Encargado del laboratorio<br/>navegador web"]
+    CLI["Cliente externo (curl)<br/>POST /webhook/prestamos<br/>Header X-API-Key"]
 
-    subgraph LOCAL["Computadora local — Docker Compose"]
+    subgraph LOCAL["Computadora local — Docker Compose (3 contenedores)"]
         direction LR
+        APP["Aplicación web<br/>inventario_app :8080<br/>Spring Boot + Thymeleaf<br/>comprobante PDF"]
         subgraph N8N["n8n (inventario_n8n :5678)"]
             WF1["WF1<br/>Ingesta"]
             WF2["WF2<br/>Procesamiento"]
@@ -14,6 +17,8 @@ flowchart LR
         ENV[".env<br/>credenciales"]
     end
 
+    USR <-->|"formulario y<br/>comprobante PDF"| APP
+    APP -->|"POST http://n8n:5678<br/>Header X-API-Key"| WF1
     CLI -->|"solicitud JSON"| WF1
     WF1 -->|"datos válidos"| WF2
     WF1 -->|"auditoría de rechazos"| PG
@@ -22,5 +27,6 @@ flowchart LR
     WF3 -->|"escribe CSV"| REP
     WF1 & WF2 & WF3 -.->|"si fallan"| WF4
     WF4 -->|"registra error"| PG
+    ENV -.->|"N8N_API_KEY"| APP
     ENV -.->|"variables de entorno"| N8N
     ENV -.->|"variables de entorno"| PG
